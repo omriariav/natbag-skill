@@ -180,12 +180,11 @@ def cmd_cancellations(conn, args):
 
 def cmd_airports(conn, args):
     rows = conn.execute(
-        "SELECT iata_code, name, city, country, lat, lon FROM airports WHERE UPPER(city) LIKE ?",
+        "SELECT iata_code, name, city, country FROM airports WHERE UPPER(city) LIKE ?",
         (f"%{args['query'].upper()}%",)
     ).fetchall()
 
-    print(json.dumps([{"code": r[0], "name": r[1], "city": r[2],
-                       "country": r[3], "lat": r[4], "lon": r[5]}
+    print(json.dumps([{"code": r[0], "name": r[1], "city": r[2], "country": r[3]}
                       for r in rows], indent=2))
 
 

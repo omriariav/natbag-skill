@@ -89,4 +89,6 @@ python3 -c "import json; f=open('$HOME/.natbag/config.json','r+'); d=json.load(f
 
 ## License
 
-Flight data: [data.gov.il terms](https://data.gov.il/terms). Airports: [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) (ip2location) + [ODbL-1.0](https://opendatacommons.org/licenses/odbl/1.0/) (OpenFlights). Airlines: [ODbL-1.0](https://opendatacommons.org/licenses/odbl/1.0/).
+Flight data: [data.gov.il terms](https://data.gov.il/terms).
+
+Airport data is a modified merge of [ip2location IATA/ICAO](https://github.com/ip2location/ip2location-iata-icao-real) ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)) and [OpenFlights](https://github.com/jpatokal/openflights) ([ODbL-1.0](https://opendatacommons.org/licenses/odbl/1.0/)). Airline data scraped from [Wikipedia](https://en.wikipedia.org/wiki/List_of_airline_codes) ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)).
