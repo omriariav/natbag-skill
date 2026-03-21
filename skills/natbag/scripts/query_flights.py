@@ -18,6 +18,7 @@ Flags:
     --status STATUS          Filter by exact status
     --search TEXT            Full-text search
     --upcoming               Exclude LANDED/DEPARTED/CANCELED (API-side filter)
+                             Ignored if --status is also set (explicit status takes precedence)
     --max N                  Limit output to first N results
 """
 
