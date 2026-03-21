@@ -88,9 +88,11 @@ All requests should include: `User-Agent: datagov-external-client`
 
 ## curl Query Patterns
 
+All curl examples should include `-H 'User-Agent: datagov-external-client'`.
+
 ### All departures, sorted by time
 ```bash
-curl -s 'https://data.gov.il/api/3/action/datastore_search?resource_id=e83f763b-b7d7-479e-b172-ae981ddc6de5&limit=200&filters=\{"CHAORD":"D"\}&sort=CHSTOL%20asc' | python3 -c "import sys,json; [print(f\"{r['CHSTOL'][11:16]}  {r['CHOPER']}{r['CHFLTN']:>5}  {r['CHLOC1T']:15} {r['CHRMINE']}\") for r in json.load(sys.stdin)['result']['records']]"
+curl -s -H 'User-Agent: datagov-external-client' 'https://data.gov.il/api/3/action/datastore_search?resource_id=e83f763b-b7d7-479e-b172-ae981ddc6de5&limit=200&filters=\{"CHAORD":"D"\}&sort=CHSTOL%20asc' | python3 -c "import sys,json; [print(f\"{r['CHSTOL'][11:16]}  {r['CHOPER']}{r['CHFLTN']:>5}  {r['CHLOC1T']:15} {r['CHRMINE']}\") for r in json.load(sys.stdin)['result']['records']]"
 ```
 
 ### All arrivals
