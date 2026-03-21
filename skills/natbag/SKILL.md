@@ -85,7 +85,7 @@ The local DB at `~/.natbag/flights.db` includes `airlines` and `airports` tables
   ```
   Then query each relevant code (LHR, LGW, STN, LTN, LCY) or use full-text search `--search London`.
 - **Partial flight numbers**: User says "flight 001" without airline → use `--search 001` to match across all airlines.
-- **Hebrew city names**: User types "לונדון" → use full-text search which matches Hebrew fields: `--search לונדון`.
+- **Hebrew city names**: User types "לונדון" → use `--search לונדון`. Supports partial prefix matching (e.g., `--search לונ` finds לונדון).
 - **Empty results**: If a filtered query returns 0 results, try broadening: drop the direction filter, switch from exact filter to `--search`, or check if the city has multiple airport codes.
 
 ### Output Fields

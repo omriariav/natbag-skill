@@ -27,8 +27,10 @@ import sqlite3
 import sys
 from pathlib import Path
 from urllib.parse import quote
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 from urllib.error import URLError
+
+USER_AGENT = "datagov-external-client"
 
 DB_PATH = Path.home() / ".natbag" / "flights.db"
 
@@ -119,10 +121,19 @@ def fetch(args):
     url = f"{API_BASE}&limit={args['limit']}&sort={quote(args['sort'])}"
     if args["filters"]:
         url += f"&filters={quote(json.dumps(args['filters']))}"
-    if args["search"]:
-        url += f"&q={quote(args['search'])}"
+    if args["search"] and args["search"].strip():
+        # Partial/prefix search: sanitize, append :* to each word, use plain=false
+        import re
+        words = args["search"].strip().split()
+        # Strip tsquery operators to prevent injection: keep only alphanumeric + Hebrew
+        sanitized = [re.sub(r"[^a-zA-Z0-9\u0590-\u05FF]", "", w) for w in words]
+        sanitized = [w for w in sanitized if w]
+        if sanitized:
+            term = " & ".join(f"{w}:*" for w in sanitized)
+            url += f"&q={quote(term)}&plain=false"
     try:
-        with urlopen(url, timeout=30) as resp:
+        req = Request(url, headers={"User-Agent": USER_AGENT})
+        with urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except URLError as e:
         print(f"Network error: {e}", file=sys.stderr)
