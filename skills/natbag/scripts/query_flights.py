@@ -121,6 +121,29 @@ def fetch(args):
     return data["result"]["records"], data["result"].get("total", 0)
 
 
+def clean(record):
+    """Rename cryptic API fields to readable names."""
+    stol = record.get("CHSTOL") or ""
+    return {
+        "flight": f"{record.get('CHOPER', '')} {record.get('CHFLTN', '')}".strip(),
+        "airline": (record.get("CHOPERD") or "").strip(),
+        "date": stol[:10],
+        "time": stol[11:16],
+        "updated_time": (record.get("CHPTOL") or "")[11:16],
+        "direction": "departure" if record.get("CHAORD") == "D" else "arrival",
+        "city": record.get("CHLOC1T") or "",
+        "city_he": record.get("CHLOC1TH") or "",
+        "country": record.get("CHLOCCT") or "",
+        "country_he": record.get("CHLOC1CH") or "",
+        "airport": record.get("CHLOC1") or "",
+        "terminal": record.get("CHTERM"),
+        "gate": record.get("CHCINT"),
+        "checkin_zone": record.get("CHCKZN"),
+        "status": record.get("CHRMINE") or "",
+        "status_he": record.get("CHRMINH") or "",
+    }
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: query_flights.py [--departures|--arrivals] [--airline CODE] "
@@ -130,7 +153,7 @@ def main():
 
     args = parse_args(sys.argv)
     records, _ = fetch(args)
-    print(json.dumps(records, ensure_ascii=False, indent=2))
+    print(json.dumps([clean(r) for r in records], ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
