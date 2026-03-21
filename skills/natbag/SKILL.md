@@ -29,19 +29,22 @@ Live flight data, destination weather, and historical analysis for Ben Gurion Ai
 2. **Weather**: Open-Meteo API — free, no API key — current conditions at destination
 3. **Historical**: Local SQLite DB at `~/.natbag/flights.db` — accumulated via daily snapshots
 
-## Before Any Query — Daily Snapshot
+## First-Run Setup
 
-On every natbag invocation, first run the snapshot script to accumulate historical data:
+On first invocation, check if `~/.natbag/config.json` exists. If not, this is a fresh install:
 
-```bash
-python3 SKILL_DIR/scripts/snapshot.py
-```
+1. Run `python3 SKILL_DIR/scripts/snapshot.py --force` to initialize the database and import IATA reference data
+2. Inform the user: "Natbag initialized. Flight data and IATA reference loaded into ~/.natbag/flights.db. Historical data will accumulate automatically on each use."
+3. Ask the user if they want daily snapshots enabled (default: yes). If they decline, run:
+   ```bash
+   python3 -c "import json; f=open('$HOME/.natbag/config.json','w'); json.dump({'daily_snapshot':False,'last_snapshot':None},f)"
+   ```
 
 Replace `SKILL_DIR` with the resolved path to this skill's directory (where this SKILL.md lives).
 
-The script self-guards: it checks `~/.natbag/config.json` and skips if it already ran today or if the user disabled snapshots (`daily_snapshot: false`). This means it effectively runs once per day on first use, with no background process.
+## Daily Snapshot (Automatic)
 
-If it fails (e.g., network error), proceed with the live query anyway — the snapshot is best-effort.
+A PreToolUse hook runs `snapshot.py` automatically whenever this skill is invoked. The script self-guards: it skips if it already ran today or if the user disabled snapshots in `~/.natbag/config.json` (`daily_snapshot: false`). No manual action needed after first-run setup.
 
 ## Querying Live Flights
 
@@ -188,9 +191,10 @@ When the user writes in Hebrew, respond in Hebrew and use Hebrew field values:
 ## Snapshot Management
 
 The `scripts/snapshot.py` script fetches current flights and stores them in SQLite:
-- Runs automatically on first skill use each day (see "Before Any Query" above)
+- Runs automatically via PreToolUse hook on each skill invocation (self-guards to once daily)
 - `python3 SKILL_DIR/scripts/snapshot.py --force` to run manually anytime
 - Opt-out: set `daily_snapshot: false` in `~/.natbag/config.json`
+- First run also imports airline/airport IATA data from `data/iata.db`
 - Data deduplicates by airline+flight+scheduled time
 - Status and gate info are updated on each snapshot
 
