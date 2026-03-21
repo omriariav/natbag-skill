@@ -35,8 +35,11 @@ FIELDS = [
 
 def load_config():
     if CONFIG_PATH.exists():
-        with open(CONFIG_PATH) as f:
-            return json.load(f)
+        try:
+            with open(CONFIG_PATH) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {"daily_snapshot": True, "last_snapshot": None}
     return {"daily_snapshot": True, "last_snapshot": None}
 
 
@@ -53,9 +56,12 @@ def should_run(config, force=False):
         return False
     last = config.get("last_snapshot")
     if last:
-        last_date = datetime.fromisoformat(last).date()
-        if last_date == datetime.now(timezone.utc).date():
-            return False
+        try:
+            last_date = datetime.fromisoformat(last).date()
+            if last_date == datetime.now(timezone.utc).date():
+                return False
+        except (ValueError, TypeError):
+            pass
     return True
 
 
@@ -205,8 +211,11 @@ def main():
         new_count, updated_count = upsert_flights(conn, records)
         total = conn.execute("SELECT COUNT(*) FROM flights").fetchone()[0]
         print(f"Snapshot: {new_count} new, {updated_count} updated, {total} total flights in DB")
-    except (URLError, RuntimeError) as e:
+    except (URLError, RuntimeError, json.JSONDecodeError) as e:
         print(f"Error fetching flights: {e}", file=sys.stderr)
+        sys.exit(1)
+    except sqlite3.Error as e:
+        print(f"Database error: {e}", file=sys.stderr)
         sys.exit(1)
     finally:
         conn.close()

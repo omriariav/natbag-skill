@@ -60,7 +60,11 @@ def parse_args(argv):
             args["search"] = argv[i]
         elif a == "--limit" and i + 1 < len(argv):
             i += 1
-            args["limit"] = int(argv[i])
+            try:
+                args["limit"] = int(argv[i])
+            except ValueError:
+                print(f"Invalid --limit value: {argv[i]}", file=sys.stderr)
+                sys.exit(1)
         elif a == "--json":
             args["json"] = True
         i += 1
@@ -73,13 +77,16 @@ def resolve_airline(name_or_code):
         return name_or_code.upper()
     if not DB_PATH.exists():
         return name_or_code.upper()
-    conn = sqlite3.connect(str(DB_PATH))
-    row = conn.execute(
-        "SELECT iata_code FROM airlines WHERE UPPER(name) LIKE ? LIMIT 1",
-        (f"%{name_or_code.upper()}%",)
-    ).fetchone()
-    conn.close()
-    return row[0] if row else name_or_code.upper()
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        row = conn.execute(
+            "SELECT iata_code FROM airlines WHERE UPPER(name) LIKE ? LIMIT 1",
+            (f"%{name_or_code.upper()}%",)
+        ).fetchone()
+        conn.close()
+        return row[0] if row else name_or_code.upper()
+    except sqlite3.Error:
+        return name_or_code.upper()
 
 
 def parse_flight_number(flight):
@@ -93,38 +100,21 @@ def parse_flight_number(flight):
     return flight, None
 
 
-def get_airport_name(iata_code):
-    """Look up airport city name from local DB."""
-    if not DB_PATH.exists():
-        return None
-    conn = sqlite3.connect(str(DB_PATH))
-    row = conn.execute(
-        "SELECT city, name FROM airports WHERE iata_code = ?", (iata_code,)
-    ).fetchone()
-    conn.close()
-    return row if row else None
-
-
-def get_airline_name(iata_code):
-    """Look up airline name from local DB."""
-    if not DB_PATH.exists():
-        return None
-    conn = sqlite3.connect(str(DB_PATH))
-    row = conn.execute(
-        "SELECT name FROM airlines WHERE iata_code = ?", (iata_code,)
-    ).fetchone()
-    conn.close()
-    return row[0] if row else None
-
-
 def fetch(args):
     url = f"{API_BASE}&limit={args['limit']}&sort={quote(args['sort'])}"
     if args["filters"]:
         url += f"&filters={quote(json.dumps(args['filters']))}"
     if args["search"]:
         url += f"&q={quote(args['search'])}"
-    with urlopen(url, timeout=30) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urlopen(url, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except URLError as e:
+        print(f"Network error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Invalid API response: {e}", file=sys.stderr)
+        sys.exit(1)
     if not data.get("success"):
         print(f"API error: {data.get('error', 'unknown')}", file=sys.stderr)
         sys.exit(1)
@@ -159,7 +149,7 @@ def main():
         sys.exit(0)
 
     args = parse_args(sys.argv)
-    records, total = fetch(args)
+    records, _ = fetch(args)
 
     if args["json"]:
         print(json.dumps(records, ensure_ascii=False, indent=2))

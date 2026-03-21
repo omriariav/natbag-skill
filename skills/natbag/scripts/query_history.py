@@ -27,7 +27,11 @@ def get_conn():
     if not DB_PATH.exists():
         print("No historical database found. Run snapshot.py first.", file=sys.stderr)
         sys.exit(1)
-    return sqlite3.connect(str(DB_PATH))
+    try:
+        return sqlite3.connect(str(DB_PATH))
+    except sqlite3.Error as e:
+        print(f"Database error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def parse_args(argv):
@@ -54,7 +58,11 @@ def parse_args(argv):
             args["route"] = argv[i].upper()
         elif a == "--days" and i + 1 < len(argv):
             i += 1
-            args["days"] = int(argv[i])
+            try:
+                args["days"] = int(argv[i])
+            except ValueError:
+                print(f"Invalid --days value: {argv[i]}", file=sys.stderr)
+                sys.exit(1)
         elif a == "--departures":
             args["direction"] = "D"
         elif a == "--arrivals":
@@ -65,6 +73,13 @@ def parse_args(argv):
     return args
 
 
+def _direction_filter(args, where, params):
+    """Apply --departures/--arrivals filter if set."""
+    if args["direction"]:
+        where.append("f.chaord = ?")
+        params.append(args["direction"])
+
+
 def cmd_coverage(conn, args):
     row = conn.execute("""
         SELECT MIN(chstol), MAX(chstol), COUNT(*),
@@ -73,6 +88,9 @@ def cmd_coverage(conn, args):
                COUNT(DISTINCT chloc1)
         FROM flights
     """).fetchone()
+    if not row[0]:
+        print("No flight data yet. Run snapshot.py first.")
+        return
     result = {
         "earliest": row[0], "latest": row[1], "total_flights": row[2],
         "days_covered": row[3], "airlines": row[4], "destinations": row[5]
@@ -94,9 +112,7 @@ def cmd_ontime(conn, args):
     if args["airline"]:
         where.append("f.choper = ?")
         params.append(args["airline"])
-    if args["direction"]:
-        where.append("f.chaord = ?")
-        params.append(args["direction"])
+    _direction_filter(args, where, params)
     where_sql = " AND ".join(where)
 
     rows = conn.execute(f"""
@@ -135,6 +151,7 @@ def cmd_delays(conn, args):
     if args["airline"]:
         where.append("f.choper = ?")
         params.append(args["airline"])
+    _direction_filter(args, where, params)
     where_sql = " AND ".join(where)
 
     rows = conn.execute(f"""
@@ -171,6 +188,7 @@ def cmd_cancellations(conn, args):
     if args["airline"]:
         where.append("f.choper = ?")
         params.append(args["airline"])
+    _direction_filter(args, where, params)
     where_sql = " AND ".join(where)
 
     rows = conn.execute(f"""
@@ -238,7 +256,8 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: query_history.py [--ontime|--delays|--cancellations|--coverage]")
         print("       [--airports CITY] [--airline-lookup NAME]")
-        print("       [--airline CODE] [--route CODE] [--days N] [--json]")
+        print("       [--airline CODE] [--route CODE] [--days N]")
+        print("       [--departures|--arrivals] [--json]")
         sys.exit(0)
 
     args = parse_args(sys.argv)
@@ -251,6 +270,9 @@ def main():
         {"coverage": cmd_coverage, "ontime": cmd_ontime, "delays": cmd_delays,
          "cancellations": cmd_cancellations, "airports": cmd_airports,
          "airline_lookup": cmd_airline_lookup}[args["command"]](conn, args)
+    except sqlite3.Error as e:
+        print(f"Database error: {e}", file=sys.stderr)
+        sys.exit(1)
     finally:
         conn.close()
 

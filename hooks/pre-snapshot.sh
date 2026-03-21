@@ -11,7 +11,6 @@ SKILL_NAME=$(echo "$INPUT" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
-    # tool_input.skill contains the skill name
     print(data.get('tool_input', {}).get('skill', ''))
 except:
     print('')
@@ -24,13 +23,13 @@ fi
 # Run snapshot (self-guards to once daily)
 SNAPSHOT_OUTPUT=$(python3 "$PLUGIN_ROOT/skills/natbag/scripts/snapshot.py" 2>&1 || true)
 
-# Return context to Claude
-python3 -c "
-import json, sys
+# Return context to Claude — pass output via env var to avoid shell/Python injection
+SNAPSHOT_OUTPUT="$SNAPSHOT_OUTPUT" python3 -c "
+import json, os
 output = {
     'hookSpecificOutput': {
         'hookEventName': 'PreToolUse',
-        'additionalContext': '''Natbag snapshot: ${SNAPSHOT_OUTPUT}'''
+        'additionalContext': 'Natbag snapshot: ' + os.environ.get('SNAPSHOT_OUTPUT', '')
     }
 }
 print(json.dumps(output))
