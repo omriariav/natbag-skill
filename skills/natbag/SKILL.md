@@ -9,6 +9,8 @@ description: >
   Provides live flight data from Ben Gurion Airport (TLV), destination weather
   via Open-Meteo, and historical delay analysis via local SQLite database.
   Do NOT use for booking flights, non-TLV airports, or general travel planning.
+user-invocable: true
+argument-hint: "[departures|arrivals|LY001|delayed|weather <city>|history <airline>]"
 allowed-tools:
   - Bash(curl)
   - Bash(python3)
@@ -43,28 +45,38 @@ If it fails (e.g., network error), proceed with the live query anyway — the sn
 
 ## Querying Live Flights
 
-Fetch flights via `curl` and parse the JSON response. Always use `limit=200` to get the full dataset.
+Use the composable `query_flights.py` script for live API queries:
 
-**Base pattern:**
 ```bash
-curl -s 'https://data.gov.il/api/3/action/datastore_search?resource_id=e83f763b-b7d7-479e-b172-ae981ddc6de5&limit=200&filters={"CHAORD":"D"}&sort=CHSTOL%20asc'
+python3 SKILL_DIR/scripts/query_flights.py --departures
+python3 SKILL_DIR/scripts/query_flights.py --arrivals --airline LY
+python3 SKILL_DIR/scripts/query_flights.py --flight LY001
+python3 SKILL_DIR/scripts/query_flights.py --destination JFK
+python3 SKILL_DIR/scripts/query_flights.py --status DELAYED
+python3 SKILL_DIR/scripts/query_flights.py --search "London"
+python3 SKILL_DIR/scripts/query_flights.py --departures --json   # machine-readable
 ```
 
-### Filter Recipes
+Flags can be combined. Add `--json` for structured output Claude can process further.
 
-| Use Case | filters | sort |
-|----------|---------|------|
-| All departures | `{"CHAORD":"D"}` | `CHSTOL asc` |
-| All arrivals | `{"CHAORD":"A"}` | `CHSTOL asc` |
-| Specific airline | `{"CHOPER":"LY"}` | `CHSTOL asc` |
-| Specific destination | `{"CHLOC1":"AMS"}` | `CHSTOL asc` |
-| Departures to city | `{"CHAORD":"D","CHLOC1":"JFK"}` | `CHSTOL asc` |
-| Delayed flights | `{"CHRMINE":"DELAYED"}` | `CHSTOL asc` |
-| Cancelled flights | `{"CHRMINE":"CANCELED"}` | `CHSTOL asc` |
+For raw API access, use `curl` directly — see [references/api.md](references/api.md) for filter patterns.
 
-For flight number lookup, use full-text search: `q=LY001` or filter by both `CHOPER` and `CHFLTN`.
+### Resolving Ambiguous Queries
 
-When the user mentions a city name instead of an airport code, use `q=AMSTERDAM` (full-text) since city name fields may not match exactly.
+The local DB at `~/.natbag/flights.db` includes `airlines` and `airports` tables (from [data/iata.db](data/iata.db)) for resolving user input:
+
+- **Airline name → code**: User says "El Al" or "Wizz Air" → look up IATA code:
+  ```bash
+  python3 SKILL_DIR/scripts/query_history.py --airline-lookup "El Al"
+  ```
+- **Multi-airport cities**: User says "flights to London" → find all London airports:
+  ```bash
+  python3 SKILL_DIR/scripts/query_history.py --airports London
+  ```
+  Then query each relevant code (LHR, LGW, STN, LTN, LCY) or use full-text search `--search London`.
+- **Partial flight numbers**: User says "flight 001" without airline → use `--search 001` to match across all airlines.
+- **Hebrew city names**: User types "לונדון" → use full-text search which matches Hebrew fields: `--search לונדון`.
+- **Empty results**: If a filtered query returns 0 results, try broadening: drop the direction filter, switch from exact filter to `--search`, or check if the city has multiple airport codes.
 
 ### Key Fields
 
@@ -95,26 +107,29 @@ After showing flight info, offer weather at the destination. Uses Open-Meteo (fr
 3. Fetch weather: `curl -s 'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true'`
 4. Display: temperature, weather description, wind speed
 
-Cache geocoding results in `~/.natbag/geo_cache.json` to avoid repeated lookups — write `{"city": {"lat": x, "lon": y}}` entries.
+For coordinates, first check the local `airports` table: `sqlite3 ~/.natbag/flights.db "SELECT lat, lon FROM airports WHERE iata_code = 'LHR'"`. Fall back to the Open-Meteo geocoding API if not found.
 
 Weather codes: 0=Clear, 1-3=Partly cloudy, 45/48=Fog, 51-55=Drizzle, 61-65=Rain, 71-75=Snow, 80-82=Showers, 95=Thunderstorm.
 
 ## Historical Analysis
 
-Query `~/.natbag/flights.db` with `sqlite3` for delay patterns, on-time performance, and cancellation rates.
+Use the composable `query_history.py` script for historical queries:
 
-If the database doesn't exist or is empty, inform the user: "Historical data accumulates from install date via daily snapshots. Run `python3 <skill-path>/scripts/snapshot.py --force` to start collecting now."
-
-Check data coverage first:
-```sql
-SELECT MIN(chstol) as earliest, MAX(chstol) as latest, COUNT(*) as total FROM flights;
+```bash
+python3 SKILL_DIR/scripts/query_history.py --coverage                    # data range
+python3 SKILL_DIR/scripts/query_history.py --ontime                      # all airlines
+python3 SKILL_DIR/scripts/query_history.py --ontime --airline LY          # specific airline
+python3 SKILL_DIR/scripts/query_history.py --delays --route JFK           # delays by route
+python3 SKILL_DIR/scripts/query_history.py --cancellations                # cancellation rates
+python3 SKILL_DIR/scripts/query_history.py --airports London              # multi-airport lookup
+python3 SKILL_DIR/scripts/query_history.py --airline-lookup "Wizz"        # airline code lookup
 ```
 
-Common queries — see [references/api.md](references/api.md) for full patterns:
-- On-time performance by airline (last 30 days)
-- Average delay for a specific route
-- Cancellation rate by destination
-- Delay calculation: `(julianday(chptol) - julianday(chstol)) * 24 * 60` gives minutes
+Add `--days N` to change the lookback period (default: 30). Add `--json` for structured output.
+
+If the database doesn't exist or is empty, inform the user: "Historical data accumulates from install date via daily snapshots. Run `python3 SKILL_DIR/scripts/snapshot.py --force` to start collecting now."
+
+For custom SQL queries, use `sqlite3 ~/.natbag/flights.db` directly. The DB also has `airlines` and `airports` tables for JOINs. See [references/api.md](references/api.md) for query patterns.
 
 ## Output Formatting
 

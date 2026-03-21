@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""Query live Ben Gurion Airport flights with human-friendly output.
+
+Wraps the data.gov.il API with argument parsing, airline/airport name resolution
+via the local IATA database, and clean JSON or table output.
+
+Usage:
+    query_flights.py --departures
+    query_flights.py --arrivals --airline LY
+    query_flights.py --destination JFK
+    query_flights.py --flight LY001
+    query_flights.py --status DELAYED
+    query_flights.py --search "London"
+    query_flights.py --departures --json
+"""
+
+import json
+import sqlite3
+import sys
+from pathlib import Path
+from urllib.parse import quote
+from urllib.request import urlopen
+from urllib.error import URLError
+
+DB_PATH = Path.home() / ".natbag" / "flights.db"
+
+API_BASE = (
+    "https://data.gov.il/api/3/action/datastore_search"
+    "?resource_id=e83f763b-b7d7-479e-b172-ae981ddc6de5"
+)
+
+
+def parse_args(argv):
+    args = {"filters": {}, "sort": "CHSTOL asc", "limit": 200, "json": False, "search": None}
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a == "--departures":
+            args["filters"]["CHAORD"] = "D"
+        elif a == "--arrivals":
+            args["filters"]["CHAORD"] = "A"
+        elif a == "--airline" and i + 1 < len(argv):
+            i += 1
+            args["filters"]["CHOPER"] = resolve_airline(argv[i])
+        elif a == "--destination" and i + 1 < len(argv):
+            i += 1
+            args["filters"]["CHLOC1"] = argv[i].upper()
+        elif a == "--status" and i + 1 < len(argv):
+            i += 1
+            args["filters"]["CHRMINE"] = argv[i].upper()
+        elif a == "--flight" and i + 1 < len(argv):
+            i += 1
+            code, num = parse_flight_number(argv[i])
+            if code:
+                args["filters"]["CHOPER"] = code
+            if num:
+                args["filters"]["CHFLTN"] = num
+        elif a == "--search" and i + 1 < len(argv):
+            i += 1
+            args["search"] = argv[i]
+        elif a == "--limit" and i + 1 < len(argv):
+            i += 1
+            args["limit"] = int(argv[i])
+        elif a == "--json":
+            args["json"] = True
+        i += 1
+    return args
+
+
+def resolve_airline(name_or_code):
+    """Resolve airline name to IATA code using local DB."""
+    if len(name_or_code) == 2 and name_or_code.isalnum():
+        return name_or_code.upper()
+    if not DB_PATH.exists():
+        return name_or_code.upper()
+    conn = sqlite3.connect(str(DB_PATH))
+    row = conn.execute(
+        "SELECT iata_code FROM airlines WHERE UPPER(name) LIKE ? LIMIT 1",
+        (f"%{name_or_code.upper()}%",)
+    ).fetchone()
+    conn.close()
+    return row[0] if row else name_or_code.upper()
+
+
+def parse_flight_number(flight):
+    """Parse 'LY001', 'LY 001', or just '001' into (code, number)."""
+    flight = flight.strip().upper().replace(" ", "")
+    for i, c in enumerate(flight):
+        if c.isdigit():
+            code = flight[:i] if i > 0 else None
+            num = flight[i:]
+            return code, num
+    return flight, None
+
+
+def get_airport_name(iata_code):
+    """Look up airport city name from local DB."""
+    if not DB_PATH.exists():
+        return None
+    conn = sqlite3.connect(str(DB_PATH))
+    row = conn.execute(
+        "SELECT city, name FROM airports WHERE iata_code = ?", (iata_code,)
+    ).fetchone()
+    conn.close()
+    return row if row else None
+
+
+def get_airline_name(iata_code):
+    """Look up airline name from local DB."""
+    if not DB_PATH.exists():
+        return None
+    conn = sqlite3.connect(str(DB_PATH))
+    row = conn.execute(
+        "SELECT name FROM airlines WHERE iata_code = ?", (iata_code,)
+    ).fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
+def fetch(args):
+    url = f"{API_BASE}&limit={args['limit']}&sort={quote(args['sort'])}"
+    if args["filters"]:
+        url += f"&filters={quote(json.dumps(args['filters']))}"
+    if args["search"]:
+        url += f"&q={quote(args['search'])}"
+    with urlopen(url, timeout=30) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    if not data.get("success"):
+        print(f"API error: {data.get('error', 'unknown')}", file=sys.stderr)
+        sys.exit(1)
+    return data["result"]["records"], data["result"].get("total", 0)
+
+
+def format_table(records):
+    if not records:
+        print("No flights found.")
+        return
+    header = f"{'Time':>5}  {'Flight':<8}  {'Airline':<18}  {'City':<16}  {'Gate':<10}  {'Status'}"
+    print(header)
+    print("-" * len(header))
+    for r in records:
+        time = (r.get("CHSTOL") or "")[11:16]
+        flight = f"{r.get('CHOPER', '')}{r.get('CHFLTN', ''):>4}"
+        airline = (r.get("CHOPERD") or "")[:18]
+        city = f"{(r.get('CHLOC1T') or '')[:13]} ({r.get('CHLOC1', '')})"
+        gate = r.get("CHCINT") or "—"
+        status = r.get("CHRMINE") or ""
+        if status == "DELAYED" and r.get("CHPTOL"):
+            status += f" → {r['CHPTOL'][11:16]}"
+        print(f"{time:>5}  {flight:<8}  {airline:<18}  {city:<16}  {gate:<10}  {status}")
+    print(f"\n{len(records)} flights")
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: query_flights.py [--departures|--arrivals] [--airline CODE] "
+              "[--destination CODE] [--flight LY001] [--status DELAYED] "
+              "[--search TEXT] [--json]")
+        sys.exit(0)
+
+    args = parse_args(sys.argv)
+    records, total = fetch(args)
+
+    if args["json"]:
+        print(json.dumps(records, ensure_ascii=False, indent=2))
+    else:
+        format_table(records)
+
+
+if __name__ == "__main__":
+    main()
