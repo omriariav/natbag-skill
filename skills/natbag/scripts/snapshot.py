@@ -74,6 +74,20 @@ def init_db():
         # First run: copy shipped db.db (has airlines + airports tables)
         shutil.copy2(str(SHIPPED_DB), str(DB_PATH))
         print("Copied reference database (airlines + airports)")
+    elif SHIPPED_DB.stat().st_mtime > DB_PATH.stat().st_mtime:
+        # Upgrade: shipped db.db is newer — refresh airlines/airports, keep flights
+        src = sqlite3.connect(str(SHIPPED_DB))
+        dst = sqlite3.connect(str(DB_PATH))
+        dst.execute("DELETE FROM airlines")
+        dst.execute("DELETE FROM airports")
+        for row in src.execute("SELECT iata_code, name, country FROM airlines"):
+            dst.execute("INSERT OR IGNORE INTO airlines VALUES (?, ?, ?)", row)
+        for row in src.execute("SELECT iata_code, name, city, country, lat, lon FROM airports"):
+            dst.execute("INSERT OR IGNORE INTO airports VALUES (?, ?, ?, ?, ?, ?)", row)
+        dst.commit()
+        dst.close()
+        src.close()
+        print("Updated airlines/airports from new plugin version")
 
     conn = sqlite3.connect(str(DB_PATH))
     # Add flights table on top of the shipped airlines/airports

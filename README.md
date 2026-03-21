@@ -17,7 +17,7 @@ Claude Code plugin for Ben Gurion Airport (TLV) flight data.
 ```
 
 No setup required. On first use, the plugin automatically:
-1. Creates `~/.natbag/flights.db` with airline/airport reference data (from shipped `data/iata.db`)
+1. Copies shipped `data/db.db` (airlines + airports) to `~/.natbag/flights.db`
 2. Fetches live flight data from Ben Gurion Airport
 3. Starts accumulating historical data for delay analysis
 
@@ -45,7 +45,7 @@ The skill triggers automatically when you ask about TLV flights. You can also in
 ## How it works
 
 ```
-Install → ships data/iata.db (999 airlines, 6,072 airports)
+Install → ships data/db.db (999 airlines, 6,072 airports)
                 ↓
 First use → copies IATA data into ~/.natbag/flights.db + fetches live flights
                 ↓
