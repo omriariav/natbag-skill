@@ -7,7 +7,7 @@ Claude Code plugin for Ben Gurion Airport (TLV) flight data.
 - **Live flights** — Departures, arrivals, status, gates from [data.gov.il](https://data.gov.il/he/datasets/airport_authority/flydata)
 - **Destination weather** — Current conditions via [Open-Meteo](https://open-meteo.com/) (free, no API key)
 - **Historical analysis** — On-time performance, delay stats, cancellation rates from local SQLite DB
-- **IATA reference** — 992 airlines + 6,072 airports for code/name resolution
+- **IATA reference** — 999 airlines + 6,072 airports shipped with the plugin (no download needed)
 - **Bilingual** — Hebrew and English
 
 ## Install
@@ -15,6 +15,11 @@ Claude Code plugin for Ben Gurion Airport (TLV) flight data.
 ```
 /install-plugin omriariav/natbag-skill
 ```
+
+No setup required. On first use, the plugin automatically:
+1. Creates `~/.natbag/flights.db` with airline/airport reference data (from shipped `data/iata.db`)
+2. Fetches live flight data from Ben Gurion Airport
+3. Starts accumulating historical data for delay analysis
 
 ## Usage
 
@@ -39,13 +44,23 @@ The skill triggers automatically when you ask about TLV flights. You can also in
 
 ## How it works
 
-- A **PreToolUse hook** runs `snapshot.py` once daily to accumulate flight history
-- Scripts in `scripts/` provide composable CLIs (`query_flights.py`, `query_history.py`)
-- Data stored in `~/.natbag/flights.db` (SQLite)
+```
+Install → ships data/iata.db (999 airlines, 6,072 airports)
+                ↓
+First use → copies IATA data into ~/.natbag/flights.db + fetches live flights
+                ↓
+Every use → PreToolUse hook runs snapshot.py (once daily, self-guards)
+                ↓
+Query → scripts return clean JSON → Claude formats for user
+```
+
+- `snapshot.py` — fetches live flights, upserts into SQLite, imports IATA data on first run
+- `query_flights.py` — queries live API with filters (airline, destination, status)
+- `query_history.py` — queries local DB for historical stats, airport/airline lookups
 
 ## Configuration
 
-Settings are stored in `~/.natbag/config.json`:
+Settings are stored in `~/.natbag/config.json` (created automatically on first use):
 
 ```json
 {
@@ -55,17 +70,22 @@ Settings are stored in `~/.natbag/config.json`:
 ```
 
 **Disable daily snapshots:**
+
+Tell Claude: "disable natbag daily snapshots"
+
+Or manually:
 ```bash
 python3 -c "import json; f=open('$HOME/.natbag/config.json','r+'); d=json.load(f); d['daily_snapshot']=False; f.seek(0); json.dump(d,f,indent=2); f.truncate()"
 ```
 
-Or simply tell Claude: "disable natbag daily snapshots"
-
 ## Data sources
 
-- Flight data: [Israel Open Data Portal](https://data.gov.il/) (public API, no key required)
-- Weather: [Open-Meteo](https://open-meteo.com/) (free, no key required)
-- IATA reference: [OpenFlights](https://github.com/jpatokal/openflights) (ODbL-1.0)
+| Data | Source | Freshness |
+|------|--------|-----------|
+| Flight data | [Israel Open Data Portal](https://data.gov.il/) | Live (rolling ~3 day window) |
+| Weather | [Open-Meteo](https://open-meteo.com/) | Live |
+| Airlines | [Wikipedia](https://en.wikipedia.org/wiki/List_of_airline_codes) | Shipped, updated periodically |
+| Airports | [OpenFlights](https://github.com/jpatokal/openflights) | Shipped (coordinates rarely change) |
 
 ## License
 
