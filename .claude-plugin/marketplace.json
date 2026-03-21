@@ -1,0 +1,14 @@
+{
+  "name": "natbag-skill",
+  "description": "Ben Gurion Airport (TLV) flight data plugin",
+  "plugins": [
+    {
+      "name": "natbag",
+      "source": "./",
+      "description": "Live flight data, destination weather, and historical delay analysis for Ben Gurion Airport"
+    }
+  ],
+  "owner": {
+    "name": "Omri Ariav"
+  }
+}
