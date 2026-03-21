@@ -58,10 +58,11 @@ Replace `SKILL_DIR` with the resolved path to this skill's directory (where this
 Use the composable `query_flights.py` script for live API queries:
 
 ```bash
-python3 SKILL_DIR/scripts/query_flights.py --departures
-python3 SKILL_DIR/scripts/query_flights.py --arrivals --airline LY
+python3 SKILL_DIR/scripts/query_flights.py --arrivals --upcoming --max 1
+python3 SKILL_DIR/scripts/query_flights.py --departures --upcoming
+python3 SKILL_DIR/scripts/query_flights.py --arrivals --airline LY --upcoming
+python3 SKILL_DIR/scripts/query_flights.py --destination JFK --upcoming
 python3 SKILL_DIR/scripts/query_flights.py --flight LY001
-python3 SKILL_DIR/scripts/query_flights.py --destination JFK
 python3 SKILL_DIR/scripts/query_flights.py --status DELAYED
 python3 SKILL_DIR/scripts/query_flights.py --search "London"
 ```

@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 """Query live Ben Gurion Airport flights. Returns clean JSON.
 
-Wraps the data.gov.il API with argument parsing, airline/airport name resolution
-via the local IATA database. All output is JSON with readable field names.
-
 Usage:
-    query_flights.py --departures
-    query_flights.py --arrivals --airline LY
+    query_flights.py --departures --upcoming --max 3
+    query_flights.py --arrivals --upcoming --max 1
+    query_flights.py --airline LY --upcoming
     query_flights.py --destination JFK
     query_flights.py --flight LY001
     query_flights.py --status DELAYED
     query_flights.py --search "London"
+
+Flags:
+    --departures/--arrivals  Filter by direction
+    --airline CODE|NAME      Filter by airline (resolves names via local DB)
+    --destination CODE       Filter by airport code
+    --flight LY001           Look up specific flight
+    --status STATUS          Filter by exact status
+    --search TEXT            Full-text search
+    --upcoming               Exclude LANDED/DEPARTED/CANCELED (API-side filter)
+    --max N                  Limit output to first N results
 """
 
 import json
@@ -30,7 +38,7 @@ API_BASE = (
 
 
 def parse_args(argv):
-    args = {"filters": {}, "sort": "CHSTOL asc", "limit": 200, "search": None}
+    args = {"filters": {}, "sort": "CHSTOL asc", "limit": 200, "search": None, "upcoming": False, "max_results": None}
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -63,6 +71,15 @@ def parse_args(argv):
                 args["limit"] = int(argv[i])
             except ValueError:
                 print(f"Invalid --limit value: {argv[i]}", file=sys.stderr)
+                sys.exit(1)
+        elif a == "--upcoming":
+            args["upcoming"] = True
+        elif a == "--max" and i + 1 < len(argv):
+            i += 1
+            try:
+                args["max_results"] = int(argv[i])
+            except ValueError:
+                print(f"Invalid --max value: {argv[i]}", file=sys.stderr)
                 sys.exit(1)
         i += 1
     return args
@@ -149,8 +166,18 @@ def main():
         sys.exit(0)
 
     args = parse_args(sys.argv)
+
+    # --upcoming: use API-side IN filter to exclude past/canceled flights
+    if args["upcoming"] and "CHRMINE" not in args["filters"]:
+        args["filters"]["CHRMINE"] = ["ON TIME", "DELAYED", "EARLY", "FINAL", "NOT FINAL"]
+
     records, _ = fetch(args)
-    print(json.dumps([clean(r) for r in records], ensure_ascii=False, indent=2))
+    results = [clean(r) for r in records]
+
+    if args["max_results"]:
+        results = results[:args["max_results"]]
+
+    print(json.dumps(results, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
