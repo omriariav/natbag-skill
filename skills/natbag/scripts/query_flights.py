@@ -122,10 +122,9 @@ def fetch(args):
     if args["filters"]:
         url += f"&filters={quote(json.dumps(args['filters']))}"
     if args["search"]:
-        term = args["search"]
-        # Partial/prefix search: append :* and use plain=false
-        if not term.endswith("*"):
-            term = f"{term}:*"
+        # Partial/prefix search: append :* to each word, use plain=false
+        words = args["search"].strip().split()
+        term = " & ".join(f"{w}:*" for w in words)
         url += f"&q={quote(term)}&plain=false"
     try:
         req = Request(url, headers={"User-Agent": USER_AGENT})
