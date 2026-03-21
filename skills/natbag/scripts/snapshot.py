@@ -12,8 +12,10 @@ import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 from urllib.error import URLError
+
+USER_AGENT = "datagov-external-client"
 
 NATBAG_DIR = Path.home() / ".natbag"
 DB_PATH = NATBAG_DIR / "flights.db"
@@ -113,7 +115,8 @@ def init_db():
 
 
 def fetch_flights():
-    with urlopen(API_URL, timeout=30) as resp:
+    req = Request(API_URL, headers={"User-Agent": USER_AGENT})
+    with urlopen(req, timeout=30) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     if not data.get("success"):
         raise RuntimeError(f"API returned success=false: {data}")

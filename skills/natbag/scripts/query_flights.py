@@ -27,8 +27,10 @@ import sqlite3
 import sys
 from pathlib import Path
 from urllib.parse import quote
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 from urllib.error import URLError
+
+USER_AGENT = "datagov-external-client"
 
 DB_PATH = Path.home() / ".natbag" / "flights.db"
 
@@ -120,9 +122,14 @@ def fetch(args):
     if args["filters"]:
         url += f"&filters={quote(json.dumps(args['filters']))}"
     if args["search"]:
-        url += f"&q={quote(args['search'])}"
+        term = args["search"]
+        # Partial/prefix search: append :* and use plain=false
+        if not term.endswith("*"):
+            term = f"{term}:*"
+        url += f"&q={quote(term)}&plain=false"
     try:
-        with urlopen(url, timeout=30) as resp:
+        req = Request(url, headers={"User-Agent": USER_AGENT})
+        with urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except URLError as e:
         print(f"Network error: {e}", file=sys.stderr)

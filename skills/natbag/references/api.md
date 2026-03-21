@@ -22,9 +22,26 @@ GET https://data.gov.il/api/3/action/datastore_search
 |-------|------|-------------|---------|
 | `limit` | int | Max records (default 100) | `limit=200` |
 | `offset` | int | Pagination offset | `offset=100` |
-| `filters` | JSON | Exact field match | `filters={"CHAORD":"D"}` |
+| `filters` | JSON | Exact match or IN array | `filters={"CHAORD":"D"}` or `{"CHRMINE":["DELAYED","CANCELED"]}` |
 | `sort` | string | Sort field + direction | `sort=CHSTOL asc` |
 | `q` | string | Full-text search | `q=AMSTERDAM` |
+| `q` + `plain=false` | string | Partial/prefix search (supports Hebrew) | `q=לונ:*&plain=false` |
+| `fields` | string | Return only specific columns | `fields=CHOPER,CHFLTN,CHRMINE` |
+
+### Required Header
+
+All requests should include: `User-Agent: datagov-external-client`
+
+### Filter Capabilities (tested)
+
+| Filter type | Works | Example |
+|-------------|-------|---------|
+| Equality | Yes | `{"CHOPER": "LY"}` |
+| Array/IN | Yes | `{"CHRMINE": ["DELAYED", "CANCELED"]}` |
+| Combined | Yes | `{"CHAORD": "A", "CHRMINE": ["ON TIME", "DELAYED"]}` |
+| Greater-than | No | Fails |
+| Negation/NOT | No | Fails |
+| SQL endpoint | No | 403 blocked |
 
 ## Field Reference
 
