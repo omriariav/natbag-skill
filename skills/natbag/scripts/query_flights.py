@@ -125,10 +125,11 @@ def format_table(records):
     if not records:
         print("No flights found.")
         return
-    header = f"{'Time':>5}  {'Flight':<8}  {'Airline':<18}  {'City':<16}  {'Gate':<10}  {'Status'}"
+    header = f"{'Date':>10}  {'Time':>5}  {'Flight':<8}  {'Airline':<18}  {'City':<16}  {'Gate':<10}  {'Status'}"
     print(header)
     print("-" * len(header))
     for r in records:
+        date = (r.get("CHSTOL") or "")[5:10]
         time = (r.get("CHSTOL") or "")[11:16]
         flight = f"{r.get('CHOPER', '')}{r.get('CHFLTN', ''):>4}"
         airline = (r.get("CHOPERD") or "")[:18]
@@ -137,7 +138,7 @@ def format_table(records):
         status = r.get("CHRMINE") or ""
         if status == "DELAYED" and r.get("CHPTOL"):
             status += f" → {r['CHPTOL'][11:16]}"
-        print(f"{time:>5}  {flight:<8}  {airline:<18}  {city:<16}  {gate:<10}  {status}")
+        print(f"{date:>10}  {time:>5}  {flight:<8}  {airline:<18}  {city:<16}  {gate:<10}  {status}")
     print(f"\n{len(records)} flights")
 
 
