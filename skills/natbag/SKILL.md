@@ -116,12 +116,13 @@ For complete output examples: see [examples/](examples/) (departure board, singl
 After showing flight info, offer weather at the destination. Uses Open-Meteo (free, no key).
 
 **Steps:**
-1. Geocode the city: `curl -s 'https://geocoding-api.open-meteo.com/v1/search?name={CHLOC1T}&count=1'`
-2. Extract `latitude` and `longitude` from `results[0]`
-3. Fetch weather: `curl -s 'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true'`
-4. Display: temperature, weather description, wind speed
+1. Get the `city` field from the flight JSON (e.g., "BERLIN")
+2. Geocode: `curl -s 'https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1'`
+3. Extract `latitude` and `longitude` from `results[0]`
+4. Fetch weather: `curl -s 'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true'`
+5. Display: temperature, weather description, wind speed
 
-For coordinates, first check the local `airports` table: `sqlite3 ~/.natbag/flights.db "SELECT lat, lon FROM airports WHERE iata_code = 'LHR'"`. Fall back to the Open-Meteo geocoding API if not found.
+Open-Meteo returns the most populated city match, so "Berlin" → Berlin Germany (not Berlin NH). Tested and correct for all TLV route cities.
 
 Weather codes: 0=Clear, 1-3=Partly cloudy, 45/48=Fog, 51-55=Drizzle, 61-65=Rain, 71-75=Snow, 80-82=Showers, 95=Thunderstorm.
 

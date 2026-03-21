@@ -84,8 +84,8 @@ def init_db():
         dst.execute("DELETE FROM airports")
         for row in src.execute("SELECT iata_code, name, country FROM airlines"):
             dst.execute("INSERT OR IGNORE INTO airlines VALUES (?, ?, ?)", row)
-        for row in src.execute("SELECT iata_code, name, city, country, lat, lon FROM airports"):
-            dst.execute("INSERT OR IGNORE INTO airports VALUES (?, ?, ?, ?, ?, ?)", row)
+        for row in src.execute("SELECT iata_code, name, city, country FROM airports"):
+            dst.execute("INSERT OR IGNORE INTO airports VALUES (?, ?, ?, ?)", row)
         dst.commit()
         dst.close()
         src.close()
