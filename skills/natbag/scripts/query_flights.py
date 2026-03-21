@@ -121,41 +121,16 @@ def fetch(args):
     return data["result"]["records"], data["result"].get("total", 0)
 
 
-def format_table(records):
-    if not records:
-        print("No flights found.")
-        return
-    header = f"{'Date':>10}  {'Time':>5}  {'Flight':<8}  {'Airline':<18}  {'City':<16}  {'Gate':<10}  {'Status'}"
-    print(header)
-    print("-" * len(header))
-    for r in records:
-        date = (r.get("CHSTOL") or "")[5:10]
-        time = (r.get("CHSTOL") or "")[11:16]
-        flight = f"{r.get('CHOPER', '')}{r.get('CHFLTN', ''):>4}"
-        airline = (r.get("CHOPERD") or "")[:18]
-        city = f"{(r.get('CHLOC1T') or '')[:13]} ({r.get('CHLOC1', '')})"
-        gate = r.get("CHCINT") or "—"
-        status = r.get("CHRMINE") or ""
-        if status == "DELAYED" and r.get("CHPTOL"):
-            status += f" → {r['CHPTOL'][11:16]}"
-        print(f"{date:>10}  {time:>5}  {flight:<8}  {airline:<18}  {city:<16}  {gate:<10}  {status}")
-    print(f"\n{len(records)} flights")
-
-
 def main():
     if len(sys.argv) < 2:
         print("Usage: query_flights.py [--departures|--arrivals] [--airline CODE] "
               "[--destination CODE] [--flight LY001] [--status DELAYED] "
-              "[--search TEXT] [--json]")
+              "[--search TEXT]")
         sys.exit(0)
 
     args = parse_args(sys.argv)
     records, _ = fetch(args)
-
-    if args["json"]:
-        print(json.dumps(records, ensure_ascii=False, indent=2))
-    else:
-        format_table(records)
+    print(json.dumps(records, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

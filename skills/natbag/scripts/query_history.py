@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Query historical flight data from the local SQLite database.
 
-Provides on-time performance, delay stats, and cancellation rates
-by airline, route, or time period.
+Returns JSON for all commands. Claude handles presentation.
 
 Usage:
     query_history.py --ontime                    # All airlines, last 30 days
@@ -12,7 +11,6 @@ Usage:
     query_history.py --coverage                   # Show data coverage
     query_history.py --airports London            # Find airports for a city
     query_history.py --airline-lookup "El Al"     # Find airline IATA code
-    query_history.py --json                       # JSON output
 """
 
 import json
@@ -25,18 +23,18 @@ DB_PATH = Path.home() / ".natbag" / "flights.db"
 
 def get_conn():
     if not DB_PATH.exists():
-        print("No historical database found. Run snapshot.py first.", file=sys.stderr)
+        print(json.dumps({"error": "No historical database found. Run snapshot.py first."}))
         sys.exit(1)
     try:
         return sqlite3.connect(str(DB_PATH))
     except sqlite3.Error as e:
-        print(f"Database error: {e}", file=sys.stderr)
+        print(json.dumps({"error": f"Database error: {e}"}))
         sys.exit(1)
 
 
 def parse_args(argv):
     args = {"command": None, "airline": None, "route": None, "days": 30,
-            "direction": None, "json": False, "query": None}
+            "direction": None, "query": None}
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -61,20 +59,17 @@ def parse_args(argv):
             try:
                 args["days"] = int(argv[i])
             except ValueError:
-                print(f"Invalid --days value: {argv[i]}", file=sys.stderr)
+                print(json.dumps({"error": f"Invalid --days value: {argv[i]}"}))
                 sys.exit(1)
         elif a == "--departures":
             args["direction"] = "D"
         elif a == "--arrivals":
             args["direction"] = "A"
-        elif a == "--json":
-            args["json"] = True
         i += 1
     return args
 
 
 def _direction_filter(args, where, params):
-    """Apply --departures/--arrivals filter if set."""
     if args["direction"]:
         where.append("f.chaord = ?")
         params.append(args["direction"])
@@ -89,21 +84,12 @@ def cmd_coverage(conn, args):
         FROM flights
     """).fetchone()
     if not row[0]:
-        print("No flight data yet. Run snapshot.py first.")
+        print(json.dumps({"error": "No flight data yet. Run snapshot.py first."}))
         return
-    result = {
+    print(json.dumps({
         "earliest": row[0], "latest": row[1], "total_flights": row[2],
         "days_covered": row[3], "airlines": row[4], "destinations": row[5]
-    }
-    if args["json"]:
-        print(json.dumps(result, indent=2))
-    else:
-        print(f"Historical Data Coverage")
-        print(f"  Period:       {row[0][:10]} to {row[1][:10]}")
-        print(f"  Days covered: {row[3]}")
-        print(f"  Total flights: {row[2]}")
-        print(f"  Airlines:     {row[4]}")
-        print(f"  Destinations: {row[5]}")
+    }, indent=2))
 
 
 def cmd_ontime(conn, args):
@@ -128,18 +114,10 @@ def cmd_ontime(conn, args):
         ORDER BY total DESC
     """, params).fetchall()
 
-    if args["json"]:
-        print(json.dumps([{"code": r[0], "airline": r[1], "total": r[2],
-                           "on_time": r[3], "delayed": r[4], "canceled": r[5],
-                           "on_time_pct": round(100 * r[3] / r[2], 1) if r[2] else 0}
-                          for r in rows], indent=2))
-    else:
-        print(f"On-Time Performance — Last {args['days']} Days\n")
-        print(f"{'Code':<5} {'Airline':<25} {'Total':>5} {'On Time':>8} {'Delayed':>8} {'Canceled':>9}")
-        print("-" * 65)
-        for r in rows:
-            pct = f"{100*r[3]/r[2]:.0f}%" if r[2] else "—"
-            print(f"{r[0]:<5} {(r[1] or '')[:25]:<25} {r[2]:>5} {r[3]:>5} ({pct:>3}) {r[4]:>7} {r[5]:>8}")
+    print(json.dumps([{"code": r[0], "airline": r[1], "total": r[2],
+                       "on_time": r[3], "delayed": r[4], "canceled": r[5],
+                       "on_time_pct": round(100 * r[3] / r[2], 1) if r[2] else 0}
+                      for r in rows], indent=2))
 
 
 def cmd_delays(conn, args):
@@ -169,17 +147,9 @@ def cmd_delays(conn, args):
         ORDER BY avg_delay_min DESC
     """, params).fetchall()
 
-    if args["json"]:
-        print(json.dumps([{"code": r[0], "city": r[1], "total": r[2],
-                           "delayed": r[3], "avg_delay_min": r[4]}
-                          for r in rows], indent=2))
-    else:
-        print(f"Delay Analysis — Last {args['days']} Days\n")
-        print(f"{'Route':<6} {'City':<16} {'Total':>5} {'Delayed':>8} {'Avg Delay':>10}")
-        print("-" * 50)
-        for r in rows:
-            avg = f"{int(r[4])}m" if r[4] else "—"
-            print(f"{r[0]:<6} {(r[1] or '')[:16]:<16} {r[2]:>5} {r[3]:>8} {avg:>10}")
+    print(json.dumps([{"code": r[0], "city": r[1], "total": r[2],
+                       "delayed": r[3], "avg_delay_min": r[4]}
+                      for r in rows], indent=2))
 
 
 def cmd_cancellations(conn, args):
@@ -203,16 +173,9 @@ def cmd_cancellations(conn, args):
         ORDER BY cancel_pct DESC
     """, params).fetchall()
 
-    if args["json"]:
-        print(json.dumps([{"code": r[0], "city": r[1], "total": r[2],
-                           "canceled": r[3], "cancel_pct": r[4]}
-                          for r in rows], indent=2))
-    else:
-        print(f"Cancellation Rates — Last {args['days']} Days\n")
-        print(f"{'Route':<6} {'City':<16} {'Total':>5} {'Canceled':>9} {'Rate':>6}")
-        print("-" * 45)
-        for r in rows:
-            print(f"{r[0]:<6} {(r[1] or '')[:16]:<16} {r[2]:>5} {r[3]:>9} {r[4]:>5}%")
+    print(json.dumps([{"code": r[0], "city": r[1], "total": r[2],
+                       "canceled": r[3], "cancel_pct": r[4]}
+                      for r in rows], indent=2))
 
 
 def cmd_airports(conn, args):
@@ -221,17 +184,9 @@ def cmd_airports(conn, args):
         (f"%{args['query'].upper()}%",)
     ).fetchall()
 
-    if args["json"]:
-        print(json.dumps([{"code": r[0], "name": r[1], "city": r[2],
-                           "country": r[3], "lat": r[4], "lon": r[5]}
-                          for r in rows], indent=2))
-    else:
-        if not rows:
-            print(f"No airports found for '{args['query']}'")
-            return
-        print(f"Airports matching '{args['query']}':\n")
-        for r in rows:
-            print(f"  {r[0]}  {r[1][:50]:<50}  {r[2]}, {r[3]}")
+    print(json.dumps([{"code": r[0], "name": r[1], "city": r[2],
+                       "country": r[3], "lat": r[4], "lon": r[5]}
+                      for r in rows], indent=2))
 
 
 def cmd_airline_lookup(conn, args):
@@ -240,16 +195,8 @@ def cmd_airline_lookup(conn, args):
         (f"%{args['query'].upper()}%",)
     ).fetchall()
 
-    if args["json"]:
-        print(json.dumps([{"code": r[0], "name": r[1], "country": r[2]}
-                          for r in rows], indent=2))
-    else:
-        if not rows:
-            print(f"No airlines found for '{args['query']}'")
-            return
-        print(f"Airlines matching '{args['query']}':\n")
-        for r in rows:
-            print(f"  {r[0]}  {r[1]:<40}  {r[2]}")
+    print(json.dumps([{"code": r[0], "name": r[1], "country": r[2]}
+                      for r in rows], indent=2))
 
 
 def main():
@@ -257,12 +204,12 @@ def main():
         print("Usage: query_history.py [--ontime|--delays|--cancellations|--coverage]")
         print("       [--airports CITY] [--airline-lookup NAME]")
         print("       [--airline CODE] [--route CODE] [--days N]")
-        print("       [--departures|--arrivals] [--json]")
+        print("       [--departures|--arrivals]")
         sys.exit(0)
 
     args = parse_args(sys.argv)
     if not args["command"]:
-        print("Specify a command: --ontime, --delays, --cancellations, --coverage, --airports, --airline-lookup")
+        print(json.dumps({"error": "Specify a command: --ontime, --delays, --cancellations, --coverage, --airports, --airline-lookup"}))
         sys.exit(1)
 
     conn = get_conn()
@@ -271,7 +218,7 @@ def main():
          "cancellations": cmd_cancellations, "airports": cmd_airports,
          "airline_lookup": cmd_airline_lookup}[args["command"]](conn, args)
     except sqlite3.Error as e:
-        print(f"Database error: {e}", file=sys.stderr)
+        print(json.dumps({"error": f"Database error: {e}"}))
         sys.exit(1)
     finally:
         conn.close()

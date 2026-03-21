@@ -57,10 +57,9 @@ python3 SKILL_DIR/scripts/query_flights.py --flight LY001
 python3 SKILL_DIR/scripts/query_flights.py --destination JFK
 python3 SKILL_DIR/scripts/query_flights.py --status DELAYED
 python3 SKILL_DIR/scripts/query_flights.py --search "London"
-python3 SKILL_DIR/scripts/query_flights.py --departures --json   # machine-readable
 ```
 
-Flags can be combined. Add `--json` for structured output Claude can process further.
+Flags can be combined. All scripts return JSON — Claude handles formatting for the user.
 
 For raw API access, use `curl` directly — see [references/api.md](references/api.md) for filter patterns.
 
@@ -128,7 +127,7 @@ python3 SKILL_DIR/scripts/query_history.py --airports London              # mult
 python3 SKILL_DIR/scripts/query_history.py --airline-lookup "Wizz"        # airline code lookup
 ```
 
-Add `--days N` to change the lookback period (default: 30). Add `--json` for structured output.
+Add `--days N` to change the lookback period (default: 30). All output is JSON.
 
 If the database doesn't exist or is empty, inform the user: "Historical data accumulates from install date via daily snapshots. Run `python3 SKILL_DIR/scripts/snapshot.py --force` to start collecting now."
 
