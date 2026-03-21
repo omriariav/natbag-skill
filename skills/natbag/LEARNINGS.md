@@ -27,4 +27,9 @@ Accumulated observations from real usage. Read this on every invocation to avoid
 - When `--airline-lookup` fails to match a name, fall back to searching live flight data with `--search` which uses the current airline names from the API.
 - Common mismatches: Challenge Airlines = CAL Cargo (5C), Sun d'Or = now merged into El Al.
 
+## Operational Context
+
+- High cancellation rates (especially international airlines) may be due to security situation / conflict, not weather or airline issues. Don't speculate on reasons for cancellations unless the user asks.
+- Israeli carriers (LY, IZ, 6H, E2) maintain more flights during security escalations than foreign carriers.
+
 <!-- Add new learnings below this line -->
