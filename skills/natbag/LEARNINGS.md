@@ -20,4 +20,11 @@ Accumulated observations from real usage. Read this on every invocation to avoid
 - Users may type city names in Hebrew — use full-text search `q=` parameter which matches Hebrew fields.
 - "My flight" without context — always ask for flight number or destination.
 
+## IATA Reference Data
+
+- The shipped iata.db is built from OpenFlights data last updated **February 2017**. Airline names may be outdated (e.g., "CAL Cargo Air Lines" instead of current "Challenge Airlines").
+- Airport coordinates (lat/lon) are still reliable — airports don't move.
+- When `--airline-lookup` fails to match a name, fall back to searching live flight data with `--search` which uses the current airline names from the API.
+- Common mismatches: Challenge Airlines = CAL Cargo (5C), Sun d'Or = now merged into El Al.
+
 <!-- Add new learnings below this line -->
