@@ -23,6 +23,22 @@ allowed-tools:
 
 Live flight data, destination weather, and historical analysis for Ben Gurion Airport (TLV/LLBG). Data from Israel's open data portal (data.gov.il), covering a rolling ~3-day window.
 
+## Query Workflow
+
+Show step progress to the user as each step runs:
+
+1. **Step 1: Fetching flights** — run `query_flights.py` with appropriate filters
+2. **Step 2: Getting weather** — fetch destination weather (for single flight or when relevant)
+3. **Step 3: Checking history** — query historical stats (only if user asks about delays/patterns)
+
+Not all steps run every time. Skip steps that aren't relevant to the query:
+- Departure board → Step 1 only
+- "Is my flight on time?" → Step 1 + Step 2
+- "Are El Al flights usually delayed?" → Step 3 only
+- "Next flight to London with weather" → Step 1 + Step 2
+
+Display each step label before running it so the user sees progress.
+
 ## Data Sources
 
 1. **Live flights**: data.gov.il API — departures, arrivals, status, gates

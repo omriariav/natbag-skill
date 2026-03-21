@@ -42,7 +42,24 @@ The skill triggers automatically when you ask about TLV flights. You can also in
 - A **PreToolUse hook** runs `snapshot.py` once daily to accumulate flight history
 - Scripts in `scripts/` provide composable CLIs (`query_flights.py`, `query_history.py`)
 - Data stored in `~/.natbag/flights.db` (SQLite)
-- Opt out of daily snapshots: set `daily_snapshot: false` in `~/.natbag/config.json`
+
+## Configuration
+
+Settings are stored in `~/.natbag/config.json`:
+
+```json
+{
+  "daily_snapshot": true,
+  "last_snapshot": "2026-03-21T10:00:00+00:00"
+}
+```
+
+**Disable daily snapshots:**
+```bash
+python3 -c "import json; f=open('$HOME/.natbag/config.json','r+'); d=json.load(f); d['daily_snapshot']=False; f.seek(0); json.dump(d,f,indent=2); f.truncate()"
+```
+
+Or simply tell Claude: "disable natbag daily snapshots"
 
 ## Data sources
 
