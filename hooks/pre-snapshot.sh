@@ -16,7 +16,7 @@ except:
     print('')
 " 2>/dev/null)
 
-if [[ "$SKILL_NAME" != *"natbag"* ]]; then
+if [[ "$SKILL_NAME" != "natbag" && "$SKILL_NAME" != "natbag:natbag" ]]; then
     exit 0
 fi
 

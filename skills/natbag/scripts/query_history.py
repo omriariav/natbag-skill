@@ -93,7 +93,7 @@ def cmd_coverage(conn, args):
 
 
 def cmd_ontime(conn, args):
-    where = [f"chstol >= date('now', '-{args['days']} days')"]
+    where = [f"chstol >= date('now', '-{args['days']} days')", "chstol <= datetime('now')"]
     params = []
     if args["airline"]:
         where.append("f.choper = ?")
@@ -104,8 +104,8 @@ def cmd_ontime(conn, args):
     rows = conn.execute(f"""
         SELECT f.choper, COALESCE(a.name, f.choperd) as airline_name,
             COUNT(*) as total,
-            SUM(CASE WHEN f.chrmine IN ('ON TIME','EARLY','DEPARTED','LANDED','FINAL') THEN 1 ELSE 0 END) as on_time,
-            SUM(CASE WHEN f.chrmine = 'DELAYED' THEN 1 ELSE 0 END) as delayed,
+            SUM(CASE WHEN f.chrmine != 'CANCELED' AND (f.chptol <= f.chstol OR f.chptol IS NULL) THEN 1 ELSE 0 END) as on_time,
+            SUM(CASE WHEN f.chrmine != 'CANCELED' AND f.chptol > f.chstol THEN 1 ELSE 0 END) as delayed,
             SUM(CASE WHEN f.chrmine = 'CANCELED' THEN 1 ELSE 0 END) as canceled
         FROM flights f
         LEFT JOIN airlines a ON f.choper = a.iata_code
@@ -121,7 +121,7 @@ def cmd_ontime(conn, args):
 
 
 def cmd_delays(conn, args):
-    where = [f"chstol >= date('now', '-{args['days']} days')"]
+    where = [f"chstol >= date('now', '-{args['days']} days')", "chstol <= datetime('now')"]
     params = []
     if args["route"]:
         where.append("f.chloc1 = ?")
@@ -153,7 +153,7 @@ def cmd_delays(conn, args):
 
 
 def cmd_cancellations(conn, args):
-    where = [f"chstol >= date('now', '-{args['days']} days')"]
+    where = [f"chstol >= date('now', '-{args['days']} days')", "chstol <= datetime('now')"]
     params = []
     if args["airline"]:
         where.append("f.choper = ?")

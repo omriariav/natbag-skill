@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Query live Ben Gurion Airport flights with human-friendly output.
+"""Query live Ben Gurion Airport flights. Returns clean JSON.
 
 Wraps the data.gov.il API with argument parsing, airline/airport name resolution
-via the local IATA database, and clean JSON or table output.
+via the local IATA database. All output is JSON with readable field names.
 
 Usage:
     query_flights.py --departures
@@ -11,7 +11,6 @@ Usage:
     query_flights.py --flight LY001
     query_flights.py --status DELAYED
     query_flights.py --search "London"
-    query_flights.py --departures --json
 """
 
 import json
@@ -31,7 +30,7 @@ API_BASE = (
 
 
 def parse_args(argv):
-    args = {"filters": {}, "sort": "CHSTOL asc", "limit": 200, "json": False, "search": None}
+    args = {"filters": {}, "sort": "CHSTOL asc", "limit": 200, "search": None}
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -65,8 +64,6 @@ def parse_args(argv):
             except ValueError:
                 print(f"Invalid --limit value: {argv[i]}", file=sys.stderr)
                 sys.exit(1)
-        elif a == "--json":
-            args["json"] = True
         i += 1
     return args
 

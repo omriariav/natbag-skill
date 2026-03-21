@@ -45,22 +45,13 @@ Display each step label before running it so the user sees progress.
 2. **Weather**: Open-Meteo API — free, no API key — current conditions at destination
 3. **Historical**: Local SQLite DB at `~/.natbag/flights.db` — accumulated via daily snapshots
 
-## First-Run Setup
-
-On first invocation, check if `~/.natbag/config.json` exists. If not, this is a fresh install:
-
-1. Run `python3 SKILL_DIR/scripts/snapshot.py --force` to initialize the database and import IATA reference data
-2. Inform the user: "Natbag initialized. Flight data and IATA reference loaded into ~/.natbag/flights.db. Historical data will accumulate automatically on each use."
-3. Ask the user if they want daily snapshots enabled (default: yes). If they decline, run:
-   ```bash
-   python3 -c "import json; f=open('$HOME/.natbag/config.json','w'); json.dump({'daily_snapshot':False,'last_snapshot':None},f)"
-   ```
-
-Replace `SKILL_DIR` with the resolved path to this skill's directory (where this SKILL.md lives).
-
 ## Daily Snapshot (Automatic)
 
-A PreToolUse hook runs `snapshot.py` automatically whenever this skill is invoked. The script self-guards: it skips if it already ran today or if the user disabled snapshots in `~/.natbag/config.json` (`daily_snapshot: false`). No manual action needed after first-run setup.
+A PreToolUse hook runs `snapshot.py` automatically whenever this skill is invoked. On first run, it creates `~/.natbag/flights.db`, imports IATA reference data from `data/iata.db`, and fetches live flights. On subsequent runs, it self-guards: skips if it already ran today or if the user disabled snapshots.
+
+After the first invocation, inform the user: "Natbag initialized. Flight data and IATA reference loaded. Historical data will accumulate automatically on each use. To disable daily snapshots, set `daily_snapshot: false` in `~/.natbag/config.json`."
+
+Replace `SKILL_DIR` with the resolved path to this skill's directory (where this SKILL.md lives).
 
 ## Querying Live Flights
 

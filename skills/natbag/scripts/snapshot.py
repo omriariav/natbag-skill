@@ -166,24 +166,28 @@ def upsert_flights(conn, records):
             old_status, old_ptol = existing
             new_status = values.get("chrmine", "")
             new_ptol = values.get("chptol", "")
+            new_gate = values.get("chcint", "")
+            new_ckzn = values.get("chckzn", "")
+            new_term = values.get("chterm", "")
+            # Always update — gate/check-in can change independently of status
+            conn.execute("""
+                UPDATE flights SET
+                    chrmine = :chrmine, chrminh = :chrminh,
+                    chptol = :chptol, chcint = :chcint,
+                    chckzn = :chckzn, chterm = :chterm,
+                    updated_at = :updated_at
+                WHERE flight_key = :flight_key
+            """, {
+                "chrmine": new_status,
+                "chrminh": values.get("chrminh", ""),
+                "chptol": new_ptol,
+                "chcint": new_gate,
+                "chckzn": new_ckzn,
+                "chterm": new_term,
+                "updated_at": now,
+                "flight_key": flight_key,
+            })
             if new_status != old_status or new_ptol != old_ptol:
-                conn.execute("""
-                    UPDATE flights SET
-                        chrmine = :chrmine, chrminh = :chrminh,
-                        chptol = :chptol, chcint = :chcint,
-                        chckzn = :chckzn, chterm = :chterm,
-                        updated_at = :updated_at
-                    WHERE flight_key = :flight_key
-                """, {
-                    "chrmine": new_status,
-                    "chrminh": values.get("chrminh", ""),
-                    "chptol": new_ptol,
-                    "chcint": values.get("chcint", ""),
-                    "chckzn": values.get("chckzn", ""),
-                    "chterm": values.get("chterm", ""),
-                    "updated_at": now,
-                    "flight_key": flight_key,
-                })
                 updated_count += 1
 
     conn.commit()
