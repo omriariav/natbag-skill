@@ -2,11 +2,12 @@
 """Snapshot Ben Gurion Airport flight data into local SQLite database.
 
 Fetches current flights from data.gov.il and upserts into ~/.natbag/flights.db.
-On first run, imports airlines/airports reference data from the shipped iata.db.
+On first run, copies the shipped data/db.db (airlines + airports) then adds the flights table.
 Respects ~/.natbag/config.json for daily_snapshot opt-out and dedup.
 """
 
 import json
+import shutil
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -18,7 +19,7 @@ NATBAG_DIR = Path.home() / ".natbag"
 DB_PATH = NATBAG_DIR / "flights.db"
 CONFIG_PATH = NATBAG_DIR / "config.json"
 SCRIPT_DIR = Path(__file__).resolve().parent
-IATA_DB_PATH = SCRIPT_DIR.parent / "data" / "iata.db"
+SHIPPED_DB = SCRIPT_DIR.parent / "data" / "db.db"
 
 API_URL = (
     "https://data.gov.il/api/3/action/datastore_search"
@@ -65,8 +66,31 @@ def should_run(config, force=False):
     return True
 
 
-def init_db(conn):
-    """Create all tables and indexes."""
+def init_db():
+    """Ensure ~/.natbag/flights.db exists with all tables."""
+    NATBAG_DIR.mkdir(parents=True, exist_ok=True)
+
+    if not DB_PATH.exists():
+        # First run: copy shipped db.db (has airlines + airports tables)
+        shutil.copy2(str(SHIPPED_DB), str(DB_PATH))
+        print("Copied reference database (airlines + airports)")
+    elif SHIPPED_DB.stat().st_mtime > DB_PATH.stat().st_mtime:
+        # Upgrade: shipped db.db is newer — refresh airlines/airports, keep flights
+        src = sqlite3.connect(str(SHIPPED_DB))
+        dst = sqlite3.connect(str(DB_PATH))
+        dst.execute("DELETE FROM airlines")
+        dst.execute("DELETE FROM airports")
+        for row in src.execute("SELECT iata_code, name, country FROM airlines"):
+            dst.execute("INSERT OR IGNORE INTO airlines VALUES (?, ?, ?)", row)
+        for row in src.execute("SELECT iata_code, name, city, country, lat, lon FROM airports"):
+            dst.execute("INSERT OR IGNORE INTO airports VALUES (?, ?, ?, ?, ?, ?)", row)
+        dst.commit()
+        dst.close()
+        src.close()
+        print("Updated airlines/airports from new plugin version")
+
+    conn = sqlite3.connect(str(DB_PATH))
+    # Add flights table on top of the shipped airlines/airports
     conn.execute("""
         CREATE TABLE IF NOT EXISTS flights (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,52 +108,8 @@ def init_db(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flights_chstol ON flights(chstol)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flights_chaord ON flights(chaord)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flights_choper ON flights(choper)")
-
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS airlines (
-            iata_code TEXT PRIMARY KEY,
-            name TEXT,
-            country TEXT
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS airports (
-            iata_code TEXT PRIMARY KEY,
-            name TEXT,
-            city TEXT,
-            country TEXT,
-            lat REAL,
-            lon REAL
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_airports_city ON airports(city)")
     conn.commit()
-
-
-def import_iata_data(conn):
-    """Import airlines/airports from the shipped iata.db into the user's DB."""
-    if not IATA_DB_PATH.exists():
-        print(f"  Warning: {IATA_DB_PATH} not found, skipping IATA import", file=sys.stderr)
-        return
-
-    airlines_count = conn.execute("SELECT COUNT(*) FROM airlines").fetchone()[0]
-    airports_count = conn.execute("SELECT COUNT(*) FROM airports").fetchone()[0]
-    if airlines_count > 0 and airports_count > 0:
-        return
-
-    print("Importing IATA reference data from shipped database...")
-    src = sqlite3.connect(str(IATA_DB_PATH))
-    try:
-        for row in src.execute("SELECT iata_code, name, country FROM airlines"):
-            conn.execute("INSERT OR IGNORE INTO airlines VALUES (?, ?, ?)", row)
-        for row in src.execute("SELECT iata_code, name, city, country, lat, lon FROM airports"):
-            conn.execute("INSERT OR IGNORE INTO airports VALUES (?, ?, ?, ?, ?, ?)", row)
-        conn.commit()
-        ac = conn.execute("SELECT COUNT(*) FROM airlines").fetchone()[0]
-        ap = conn.execute("SELECT COUNT(*) FROM airports").fetchone()[0]
-        print(f"  Imported {ac} airlines, {ap} airports")
-    finally:
-        src.close()
+    return conn
 
 
 def fetch_flights():
@@ -166,10 +146,6 @@ def upsert_flights(conn, records):
             old_status, old_ptol = existing
             new_status = values.get("chrmine", "")
             new_ptol = values.get("chptol", "")
-            new_gate = values.get("chcint", "")
-            new_ckzn = values.get("chckzn", "")
-            new_term = values.get("chterm", "")
-            # Always update — gate/check-in can change independently of status
             conn.execute("""
                 UPDATE flights SET
                     chrmine = :chrmine, chrminh = :chrminh,
@@ -181,9 +157,9 @@ def upsert_flights(conn, records):
                 "chrmine": new_status,
                 "chrminh": values.get("chrminh", ""),
                 "chptol": new_ptol,
-                "chcint": new_gate,
-                "chckzn": new_ckzn,
-                "chterm": new_term,
+                "chcint": values.get("chcint", ""),
+                "chckzn": values.get("chckzn", ""),
+                "chterm": values.get("chterm", ""),
                 "updated_at": now,
                 "flight_key": flight_key,
             })
@@ -205,12 +181,13 @@ def main():
             print("Already ran today. Use --force to run again.")
         return
 
-    NATBAG_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
     try:
-        init_db(conn)
-        import_iata_data(conn)
+        conn = init_db()
+    except (OSError, sqlite3.Error) as e:
+        print(f"Database error: {e}", file=sys.stderr)
+        sys.exit(1)
 
+    try:
         records = fetch_flights()
         new_count, updated_count = upsert_flights(conn, records)
         total = conn.execute("SELECT COUNT(*) FROM flights").fetchone()[0]
