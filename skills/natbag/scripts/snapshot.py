@@ -80,12 +80,15 @@ def init_db():
         # Upgrade: shipped db.db is newer — refresh airlines/airports, keep flights
         src = sqlite3.connect(str(SHIPPED_DB))
         dst = sqlite3.connect(str(DB_PATH))
+        # Drop and recreate airports table to handle schema changes (e.g., lat/lon removal)
+        dst.execute("DROP TABLE IF EXISTS airports")
+        dst.execute("CREATE TABLE airports (iata_code TEXT PRIMARY KEY, name TEXT, city TEXT, country TEXT)")
+        dst.execute("CREATE INDEX IF NOT EXISTS idx_airports_city ON airports(city)")
         dst.execute("DELETE FROM airlines")
-        dst.execute("DELETE FROM airports")
         for row in src.execute("SELECT iata_code, name, country FROM airlines"):
             dst.execute("INSERT OR IGNORE INTO airlines VALUES (?, ?, ?)", row)
-        for row in src.execute("SELECT iata_code, name, city, country, lat, lon FROM airports"):
-            dst.execute("INSERT OR IGNORE INTO airports VALUES (?, ?, ?, ?, ?, ?)", row)
+        for row in src.execute("SELECT iata_code, name, city, country FROM airports"):
+            dst.execute("INSERT OR IGNORE INTO airports VALUES (?, ?, ?, ?)", row)
         dst.commit()
         dst.close()
         src.close()

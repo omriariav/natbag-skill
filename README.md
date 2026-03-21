@@ -7,7 +7,7 @@ Claude Code plugin for Ben Gurion Airport (TLV) flight data.
 - **Live flights** — Departures, arrivals, status, gates from [data.gov.il](https://data.gov.il/he/datasets/airport_authority/flydata)
 - **Destination weather** — Current conditions via [Open-Meteo](https://open-meteo.com/) (free, no API key)
 - **Historical analysis** — On-time performance, delay stats, cancellation rates from local SQLite DB
-- **IATA reference** — 999 airlines + 6,072 airports shipped with the plugin (no download needed)
+- **IATA reference** — 999 airlines + 9,240 airports shipped with the plugin (no download needed)
 - **Bilingual** — Hebrew and English
 
 ## Install
@@ -83,10 +83,12 @@ python3 -c "import json; f=open('$HOME/.natbag/config.json','r+'); d=json.load(f
 | Data | Source | Freshness |
 |------|--------|-----------|
 | Flight data | [Israel Open Data Portal](https://data.gov.il/) | Live (rolling ~3 day window) |
-| Weather | [Open-Meteo](https://open-meteo.com/) | Live |
-| Airlines | [Wikipedia](https://en.wikipedia.org/wiki/List_of_airline_codes) | Shipped, updated periodically |
-| Airports | [OpenFlights](https://github.com/jpatokal/openflights) | Shipped (coordinates rarely change) |
+| Weather | [Open-Meteo](https://open-meteo.com/) | Live (geocoding by city name) |
+| Airlines | [Wikipedia](https://en.wikipedia.org/wiki/List_of_airline_codes) | Shipped (March 2026), 999 airlines |
+| Airports | [ip2location](https://github.com/ip2location/ip2location-iata-icao-real) + [OpenFlights](https://github.com/jpatokal/openflights) | Shipped (Dec 2025 + 2017 fallback), 9,240 airports |
 
 ## License
 
-Flight data: [data.gov.il terms](https://data.gov.il/terms). IATA reference data: [ODbL-1.0](https://opendatacommons.org/licenses/odbl/1.0/).
+Flight data: [data.gov.il terms](https://data.gov.il/terms).
+
+Airport data is a modified merge of [ip2location IATA/ICAO](https://github.com/ip2location/ip2location-iata-icao-real) ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)) and [OpenFlights](https://github.com/jpatokal/openflights) ([ODbL-1.0](https://opendatacommons.org/licenses/odbl/1.0/)). Airline data scraped from [Wikipedia](https://en.wikipedia.org/wiki/List_of_airline_codes) ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)).
