@@ -22,7 +22,7 @@ Accumulated observations from real usage. Read this on every invocation to avoid
 
 ## IATA Reference Data
 
-- The shipped iata.db is built from OpenFlights data last updated **February 2017**. Airline names may be outdated (e.g., "CAL Cargo Air Lines" instead of current "Challenge Airlines").
+- The shipped db.db has airlines from Wikipedia (March 2026) and airports from OpenFlights. Airline names are current.
 - Airport coordinates (lat/lon) are still reliable — airports don't move.
 - When `--airline-lookup` fails to match a name, fall back to searching live flight data with `--search` which uses the current airline names from the API.
 - Common mismatches: Challenge Airlines = CAL Cargo (5C), Sun d'Or = now merged into El Al.

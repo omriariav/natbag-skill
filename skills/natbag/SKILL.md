@@ -47,7 +47,7 @@ Display each step label before running it so the user sees progress.
 
 ## Daily Snapshot (Automatic)
 
-A PreToolUse hook runs `snapshot.py` automatically whenever this skill is invoked. On first run, it creates `~/.natbag/flights.db`, imports IATA reference data from `data/iata.db`, and fetches live flights. On subsequent runs, it self-guards: skips if it already ran today or if the user disabled snapshots.
+A PreToolUse hook runs `snapshot.py` automatically whenever this skill is invoked. On first run, it copies the shipped `data/db.db` (airlines + airports) to `~/.natbag/flights.db`, adds the flights table, and fetches live flights. On subsequent runs, it self-guards: skips if it already ran today or if the user disabled snapshots.
 
 After the first invocation, inform the user: "Natbag initialized. Flight data and IATA reference loaded. Historical data will accumulate automatically on each use. To disable daily snapshots, set `daily_snapshot: false` in `~/.natbag/config.json`."
 
@@ -72,7 +72,7 @@ For raw API access, use `curl` directly — see [references/api.md](references/a
 
 ### Resolving Ambiguous Queries
 
-The local DB at `~/.natbag/flights.db` includes `airlines` and `airports` tables (from [data/iata.db](data/iata.db)) for resolving user input:
+The local DB at `~/.natbag/flights.db` includes `airlines` and `airports` tables (from [data/db.db](data/db.db)) for resolving user input:
 
 - **Airline name → code**: User says "El Al" or "Wizz Air" → look up IATA code:
   ```bash
@@ -200,7 +200,7 @@ The `scripts/snapshot.py` script fetches current flights and stores them in SQLi
 - Runs automatically via PreToolUse hook on each skill invocation (self-guards to once daily)
 - `python3 SKILL_DIR/scripts/snapshot.py --force` to run manually anytime
 - Opt-out: set `daily_snapshot: false` in `~/.natbag/config.json`
-- First run also imports airline/airport IATA data from `data/iata.db`
+- First run copies shipped `data/db.db` (airlines + airports) to `~/.natbag/flights.db`
 - Data deduplicates by airline+flight+scheduled time
 - Status and gate info are updated on each snapshot
 
