@@ -82,18 +82,24 @@ def init_db():
         # Upgrade: shipped db.db is newer — refresh airlines/airports, keep flights
         src = sqlite3.connect(str(SHIPPED_DB))
         dst = sqlite3.connect(str(DB_PATH))
-        # Drop and recreate airports table to handle schema changes (e.g., lat/lon removal)
-        dst.execute("DROP TABLE IF EXISTS airports")
-        dst.execute("CREATE TABLE airports (iata_code TEXT PRIMARY KEY, name TEXT, city TEXT, country TEXT)")
-        dst.execute("CREATE INDEX IF NOT EXISTS idx_airports_city ON airports(city)")
-        dst.execute("DELETE FROM airlines")
-        for row in src.execute("SELECT iata_code, name, country FROM airlines"):
-            dst.execute("INSERT OR IGNORE INTO airlines VALUES (?, ?, ?)", row)
-        for row in src.execute("SELECT iata_code, name, city, country FROM airports"):
-            dst.execute("INSERT OR IGNORE INTO airports VALUES (?, ?, ?, ?)", row)
-        dst.commit()
-        dst.close()
-        src.close()
+        # Wrap in transaction so DROP+INSERT is atomic (safe if interrupted)
+        dst.execute("BEGIN")
+        try:
+            dst.execute("DROP TABLE IF EXISTS airports")
+            dst.execute("CREATE TABLE airports (iata_code TEXT PRIMARY KEY, name TEXT, city TEXT, country TEXT)")
+            dst.execute("CREATE INDEX IF NOT EXISTS idx_airports_city ON airports(city)")
+            dst.execute("DELETE FROM airlines")
+            for row in src.execute("SELECT iata_code, name, country FROM airlines"):
+                dst.execute("INSERT OR IGNORE INTO airlines VALUES (?, ?, ?)", row)
+            for row in src.execute("SELECT iata_code, name, city, country FROM airports"):
+                dst.execute("INSERT OR IGNORE INTO airports VALUES (?, ?, ?, ?)", row)
+            dst.execute("COMMIT")
+        except Exception:
+            dst.execute("ROLLBACK")
+            raise
+        finally:
+            dst.close()
+            src.close()
         print("Updated airlines/airports from new plugin version")
 
     conn = sqlite3.connect(str(DB_PATH))
