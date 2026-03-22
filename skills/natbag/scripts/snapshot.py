@@ -6,6 +6,7 @@ On first run, copies the shipped data/db.db (airlines + airports) then adds the 
 Respects ~/.natbag/config.json for daily_snapshot opt-out and dedup.
 """
 
+import fcntl
 import json
 import shutil
 import sqlite3
@@ -20,6 +21,7 @@ USER_AGENT = "datagov-external-client"
 NATBAG_DIR = Path.home() / ".natbag"
 DB_PATH = NATBAG_DIR / "flights.db"
 CONFIG_PATH = NATBAG_DIR / "config.json"
+LOCK_PATH = NATBAG_DIR / ".snapshot.lock"
 SCRIPT_DIR = Path(__file__).resolve().parent
 SHIPPED_DB = SCRIPT_DIR.parent / "data" / "db.db"
 
@@ -178,37 +180,51 @@ def upsert_flights(conn, records):
 
 def main():
     force = "--force" in sys.argv
-    config = load_config()
 
-    if not should_run(config, force):
-        if not config.get("daily_snapshot", True):
-            print("Snapshot disabled in config. Use --force to override.")
-        else:
-            print("Already ran today. Use --force to run again.")
+    # Serialize concurrent runs (SessionStart + PreToolUse can race)
+    NATBAG_DIR.mkdir(parents=True, exist_ok=True)
+    lock_fd = open(LOCK_PATH, "w")
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("Another snapshot is already running.")
         return
 
     try:
-        conn = init_db()
-    except (OSError, sqlite3.Error) as e:
-        print(f"Database error: {e}", file=sys.stderr)
-        sys.exit(1)
+        config = load_config()
 
-    try:
-        records = fetch_flights()
-        new_count, updated_count = upsert_flights(conn, records)
-        total = conn.execute("SELECT COUNT(*) FROM flights").fetchone()[0]
-        print(f"Snapshot: {new_count} new, {updated_count} updated, {total} total flights in DB")
-    except (URLError, RuntimeError, json.JSONDecodeError) as e:
-        print(f"Error fetching flights: {e}", file=sys.stderr)
-        sys.exit(1)
-    except sqlite3.Error as e:
-        print(f"Database error: {e}", file=sys.stderr)
-        sys.exit(1)
+        if not should_run(config, force):
+            if not config.get("daily_snapshot", True):
+                print("Snapshot disabled in config. Use --force to override.")
+            else:
+                print("Already ran today. Use --force to run again.")
+            return
+
+        try:
+            conn = init_db()
+        except (OSError, sqlite3.Error) as e:
+            print(f"Database error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        try:
+            records = fetch_flights()
+            new_count, updated_count = upsert_flights(conn, records)
+            total = conn.execute("SELECT COUNT(*) FROM flights").fetchone()[0]
+            print(f"Snapshot: {new_count} new, {updated_count} updated, {total} total flights in DB")
+        except (URLError, RuntimeError, json.JSONDecodeError) as e:
+            print(f"Error fetching flights: {e}", file=sys.stderr)
+            sys.exit(1)
+        except sqlite3.Error as e:
+            print(f"Database error: {e}", file=sys.stderr)
+            sys.exit(1)
+        finally:
+            conn.close()
+
+        config["last_snapshot"] = datetime.now(timezone.utc).isoformat()
+        save_config(config)
     finally:
-        conn.close()
-
-    config["last_snapshot"] = datetime.now(timezone.utc).isoformat()
-    save_config(config)
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
 
 
 if __name__ == "__main__":

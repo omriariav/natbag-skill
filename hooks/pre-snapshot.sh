@@ -28,6 +28,7 @@ SNAPSHOT_OUTPUT=$(python3 "$PLUGIN_ROOT/skills/natbag/scripts/snapshot.py" 2>&1 
 SNAPSHOT_OUTPUT="$SNAPSHOT_OUTPUT" python3 -c "
 import json, os
 output = {
+    'decision': 'approve',
     'hookSpecificOutput': {
         'hookEventName': 'PreToolUse',
         'additionalContext': 'Natbag snapshot: ' + os.environ.get('SNAPSHOT_OUTPUT', '')
