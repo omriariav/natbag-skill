@@ -222,7 +222,7 @@ def _ensure_changes_table(conn):
 def cmd_flight_history(conn, args):
     """Show change history for a specific flight."""
     _ensure_changes_table(conn)
-    query = args["query"].upper().replace(" ", "")
+    query = args["query"].upper().replace(" ", "").replace("-", "")
     rows = conn.execute("""
         SELECT fc.flight_key, fc.changed_at, fc.field, fc.old_value, fc.new_value,
                f.choper, COALESCE(a.name, f.choperd) as airline_name,
