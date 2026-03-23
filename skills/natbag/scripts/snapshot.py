@@ -121,6 +121,18 @@ def init_db():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flights_chstol ON flights(chstol)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flights_chaord ON flights(chaord)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flights_choper ON flights(choper)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS flight_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            flight_key TEXT NOT NULL,
+            changed_at TEXT NOT NULL,
+            field TEXT NOT NULL,
+            old_value TEXT,
+            new_value TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_changes_flight_key ON flight_changes(flight_key)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_changes_changed_at ON flight_changes(changed_at)")
     conn.commit()
     return conn
 
@@ -134,6 +146,9 @@ def fetch_flights():
     return data["result"]["records"]
 
 
+TRACKED_FIELDS = ["chrmine", "chptol", "chcint", "chckzn", "chterm"]
+
+
 def upsert_flights(conn, records):
     now = datetime.now(timezone.utc).isoformat()
     new_count = 0
@@ -145,7 +160,7 @@ def upsert_flights(conn, records):
         values["flight_key"] = flight_key
 
         existing = conn.execute(
-            "SELECT chrmine, chptol FROM flights WHERE flight_key = ?",
+            "SELECT chrmine, chptol, chcint, chckzn, chterm FROM flights WHERE flight_key = ?",
             (flight_key,)
         ).fetchone()
 
@@ -157,9 +172,18 @@ def upsert_flights(conn, records):
             conn.execute(f"INSERT INTO flights ({cols}) VALUES ({placeholders})", values)
             new_count += 1
         else:
-            old_status, old_ptol = existing
-            new_status = values.get("chrmine", "")
-            new_ptol = values.get("chptol", "")
+            old_values = dict(zip(TRACKED_FIELDS, existing))
+            has_change = False
+            for field in TRACKED_FIELDS:
+                old_val = old_values[field] or ""
+                new_val = values.get(field, "") or ""
+                if old_val != new_val:
+                    conn.execute(
+                        "INSERT INTO flight_changes (flight_key, changed_at, field, old_value, new_value) VALUES (?, ?, ?, ?, ?)",
+                        (flight_key, now, field, old_val or None, new_val or None),
+                    )
+                    has_change = True
+
             conn.execute("""
                 UPDATE flights SET
                     chrmine = :chrmine, chrminh = :chrminh,
@@ -168,16 +192,16 @@ def upsert_flights(conn, records):
                     updated_at = :updated_at
                 WHERE flight_key = :flight_key
             """, {
-                "chrmine": new_status,
+                "chrmine": values.get("chrmine", ""),
                 "chrminh": values.get("chrminh", ""),
-                "chptol": new_ptol,
+                "chptol": values.get("chptol", ""),
                 "chcint": values.get("chcint", ""),
                 "chckzn": values.get("chckzn", ""),
                 "chterm": values.get("chterm", ""),
                 "updated_at": now,
                 "flight_key": flight_key,
             })
-            if new_status != old_status or new_ptol != old_ptol:
+            if has_change:
                 updated_count += 1
 
     conn.commit()
