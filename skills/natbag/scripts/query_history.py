@@ -209,8 +209,19 @@ def cmd_airline_lookup(conn, args):
                       for r in rows], indent=2))
 
 
+def _ensure_changes_table(conn):
+    """Check if flight_changes table exists; return helpful error if not."""
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='flight_changes'"
+    ).fetchone()
+    if not row:
+        print(json.dumps({"error": "No change history yet. Run snapshot.py once after upgrading to v1.1.0."}))
+        sys.exit(0)
+
+
 def cmd_flight_history(conn, args):
     """Show change history for a specific flight."""
+    _ensure_changes_table(conn)
     query = args["query"].upper().replace(" ", "")
     rows = conn.execute("""
         SELECT fc.flight_key, fc.changed_at, fc.field, fc.old_value, fc.new_value,
@@ -219,7 +230,7 @@ def cmd_flight_history(conn, args):
         FROM flight_changes fc
         LEFT JOIN flights f ON fc.flight_key = f.flight_key
         LEFT JOIN airlines a ON f.choper = a.iata_code
-        WHERE fc.flight_key LIKE ?
+        WHERE REPLACE(fc.flight_key, '-', '') LIKE ?
         ORDER BY fc.flight_key, fc.changed_at
     """, (f"%{query}%",)).fetchall()
 
@@ -233,7 +244,8 @@ def cmd_flight_history(conn, args):
 
 def cmd_delay_patterns(conn, args):
     """Analyze how far before departure delays are announced."""
-    where = [f"f.chstol >= date('now', '-{args['days']} days')"]
+    _ensure_changes_table(conn)
+    where = [f"f.chstol >= date('now', '-{args['days']} days')", "f.chstol <= strftime('%Y-%m-%dT%H:%M:%S', 'now')"]
     params = []
     if args["airline"]:
         where.append("f.choper = ?")
@@ -247,9 +259,10 @@ def cmd_delay_patterns(conn, args):
     rows = conn.execute(f"""
         SELECT f.choper, COALESCE(a.name, f.choperd) as airline_name,
             COUNT(DISTINCT fc.flight_key) as flights_with_changes,
-            ROUND(AVG(
-                (julianday(f.chstol) - julianday(fc.changed_at)) * 24 * 60
-            ), 0) as avg_minutes_before_departure,
+            ROUND(AVG(CASE
+                WHEN fc.new_value IN ('DELAYED', 'CANCELED')
+                THEN (julianday(f.chstol) - julianday(fc.changed_at)) * 24 * 60
+            END), 0) as avg_minutes_before_departure,
             COUNT(*) as total_changes,
             SUM(CASE WHEN fc.new_value = 'DELAYED' THEN 1 ELSE 0 END) as delay_announcements,
             SUM(CASE WHEN fc.new_value = 'CANCELED' THEN 1 ELSE 0 END) as cancel_announcements
@@ -273,7 +286,8 @@ def cmd_delay_patterns(conn, args):
 
 def cmd_status_transitions(conn, args):
     """Show aggregate status transition paths."""
-    where = [f"f.chstol >= date('now', '-{args['days']} days')"]
+    _ensure_changes_table(conn)
+    where = [f"f.chstol >= date('now', '-{args['days']} days')", "f.chstol <= strftime('%Y-%m-%dT%H:%M:%S', 'now')"]
     params = []
     if args["airline"]:
         where.append("f.choper = ?")
