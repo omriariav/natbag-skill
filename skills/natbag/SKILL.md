@@ -142,9 +142,24 @@ python3 SKILL_DIR/scripts/query_history.py --airline-lookup "Wizz"        # airl
 
 Add `--days N` to change the lookback period (default: 30). All output is JSON.
 
+### Flight Change History
+
+Track how flights evolve over time — status changes, time updates, gate reassignments:
+
+```bash
+python3 SKILL_DIR/scripts/query_history.py --flight-history LY001         # all changes for a flight
+python3 SKILL_DIR/scripts/query_history.py --delay-patterns               # when are delays announced?
+python3 SKILL_DIR/scripts/query_history.py --delay-patterns --airline LY   # per-airline patterns
+python3 SKILL_DIR/scripts/query_history.py --status-transitions            # status paths (e.g., DELAYED -> CANCELED)
+```
+
+Change history accumulates from version 1.1.0 onward. Older flights (captured before the upgrade) will not have change records.
+
+Use `--flight-history` when the user asks about a specific flight's progression. Use `--delay-patterns` when they ask about how early delays are typically announced. Use `--status-transitions` when they ask about flights that were delayed then cancelled, or other status paths.
+
 If the database doesn't exist or is empty, inform the user: "Historical data accumulates from install date via daily snapshots. Run `python3 SKILL_DIR/scripts/snapshot.py --force` to start collecting now."
 
-For custom SQL queries, use `sqlite3 ~/.natbag/flights.db` directly. The DB also has `airlines` and `airports` tables for JOINs. See [references/api.md](references/api.md) for query patterns.
+For custom SQL queries, use `sqlite3 ~/.natbag/flights.db` directly. The DB also has `airlines`, `airports`, and `flight_changes` tables for JOINs. See [references/api.md](references/api.md) for query patterns.
 
 ## Output Formatting
 
