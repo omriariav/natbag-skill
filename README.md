@@ -87,6 +87,19 @@ python3 -c "import json; f=open('$HOME/.natbag/config.json','r+'); d=json.load(f
 | Airlines | [Wikipedia](https://en.wikipedia.org/wiki/List_of_airline_codes) | Shipped (March 2026), 999 airlines |
 | Airports | [ip2location](https://github.com/ip2location/ip2location-iata-icao-real) + [OpenFlights](https://github.com/jpatokal/openflights) | Shipped (Dec 2025 + 2017 fallback), 9,240 airports |
 
+## Changelog
+
+| Version | Description |
+|---------|-------------|
+| 1.1.0 | Flight change history tracking — status/time/gate changes logged per snapshot |
+| 1.0.10 | Fix hook protocol errors for non-natbag skills, file locking, atomic DB upgrades |
+| 1.0.9 | Merged airport data (9,240 airports from ip2location + OpenFlights), city-name geocoding |
+| 1.0.8 | Partial Hebrew search, user-agent header, input sanitization |
+| 1.0.7 | Server-side `--upcoming` and `--max` filters |
+| 1.0.6 | Fresh IATA data, clean JSON output, DB upgrade path |
+| 1.0.1 | Fix hooks.json format for plugin schema |
+| 1.0.0 | Initial release — live flights, weather, historical analysis, IATA reference |
+
 ## License
 
 Flight data: [data.gov.il terms](https://data.gov.il/terms).
