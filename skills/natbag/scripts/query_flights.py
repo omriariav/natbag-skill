@@ -17,6 +17,8 @@ Flags:
     --flight LY001           Look up specific flight
     --status STATUS          Filter by exact status
     --search TEXT            Full-text search
+    --date YYYY-MM-DD        Filter to specific date (client-side). Without this,
+                             the API returns a ~3-day rolling window!
     --upcoming               Exclude LANDED/DEPARTED/CANCELED (API-side filter)
                              Ignored if --status is also set (explicit status takes precedence)
     --max N                  Limit output to first N results
@@ -41,7 +43,7 @@ API_BASE = (
 
 
 def parse_args(argv):
-    args = {"filters": {}, "sort": "CHSTOL asc", "limit": 200, "search": None, "upcoming": False, "max_results": None}
+    args = {"filters": {}, "sort": "CHSTOL asc", "limit": 200, "search": None, "upcoming": False, "max_results": None, "date": None}
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -75,6 +77,9 @@ def parse_args(argv):
             except ValueError:
                 print(f"Invalid --limit value: {argv[i]}", file=sys.stderr)
                 sys.exit(1)
+        elif a == "--date" and i + 1 < len(argv):
+            i += 1
+            args["date"] = argv[i]
         elif a == "--upcoming":
             args["upcoming"] = True
         elif a == "--max" and i + 1 < len(argv):
@@ -185,6 +190,9 @@ def main():
 
     records, _ = fetch(args)
     results = [clean(r) for r in records]
+
+    if args["date"]:
+        results = [r for r in results if r["date"] == args["date"]]
 
     if args["max_results"]:
         results = results[:args["max_results"]]

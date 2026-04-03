@@ -58,9 +58,9 @@ Replace `SKILL_DIR` with the resolved path to this skill's directory (where this
 Use the composable `query_flights.py` script for live API queries:
 
 ```bash
-python3 SKILL_DIR/scripts/query_flights.py --arrivals --upcoming --max 1
-python3 SKILL_DIR/scripts/query_flights.py --departures --upcoming
-python3 SKILL_DIR/scripts/query_flights.py --arrivals --airline LY --upcoming
+python3 SKILL_DIR/scripts/query_flights.py --departures --date 2026-04-03
+python3 SKILL_DIR/scripts/query_flights.py --arrivals --date 2026-04-03 --upcoming
+python3 SKILL_DIR/scripts/query_flights.py --arrivals --airline LY --date 2026-04-03
 python3 SKILL_DIR/scripts/query_flights.py --destination JFK --upcoming
 python3 SKILL_DIR/scripts/query_flights.py --flight LY001
 python3 SKILL_DIR/scripts/query_flights.py --status DELAYED
@@ -68,6 +68,8 @@ python3 SKILL_DIR/scripts/query_flights.py --search "London"
 ```
 
 Flags can be combined. All scripts return JSON — Claude handles formatting for the user.
+
+> **CRITICAL: Always use `--date` when counting or listing flights for a specific day.** Without `--date`, the API returns a rolling ~3-day window and results will include flights from other days, inflating counts. This is the #1 source of incorrect answers.
 
 For raw API access, use `curl` directly — see [references/api.md](references/api.md) for filter patterns.
 
@@ -228,7 +230,7 @@ The `scripts/snapshot.py` script fetches current flights and stores them in SQLi
 ## Gotchas
 
 - **Field names are cryptic**: All fields start with CH (Hebrew abbreviation for "חברה"/company). Always refer to the field reference, never guess. Common mistake: using `STATUS` instead of `CHRMINE`.
-- **Rolling window**: API only has ~3 days of data. For older data, rely on local SQLite DB. If no historical DB exists, tell the user data starts accumulating from first use.
+- **Rolling window inflates counts**: API returns ~3 days of data, NOT just today. When counting flights for a specific day, ALWAYS pass `--date YYYY-MM-DD` to filter. Without it, "how many flights today?" will return 3x the real number. This has caused wrong answers repeatedly.
 - **Uppercase values**: Filter values must be uppercase. `filters={"CHRMINE":"delayed"}` returns 0 results silently — use `"DELAYED"`. Same for airline codes: `"ly"` → no results, `"LY"` → works.
 - **API timeout**: data.gov.il can be slow (5-15s). If `curl` hangs, retry once. Error: `curl: (28) Operation timed out` — fix with `curl -s --max-time 30`.
 - **Bad resource ID**: Returns `{"success": false, "error": {"__type": "Not Found Error", "message": "לא נמצא: Resource was not found."}}`. Fix: verify the resource_id constant hasn't changed.
