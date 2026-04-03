@@ -58,9 +58,9 @@ Replace `SKILL_DIR` with the resolved path to this skill's directory (where this
 Use the composable `query_flights.py` script for live API queries:
 
 ```bash
-python3 SKILL_DIR/scripts/query_flights.py --departures --date 2026-04-03
-python3 SKILL_DIR/scripts/query_flights.py --arrivals --date 2026-04-03 --upcoming
-python3 SKILL_DIR/scripts/query_flights.py --arrivals --airline LY --date 2026-04-03
+python3 SKILL_DIR/scripts/query_flights.py --departures --date YYYY-MM-DD
+python3 SKILL_DIR/scripts/query_flights.py --arrivals --date YYYY-MM-DD --upcoming
+python3 SKILL_DIR/scripts/query_flights.py --arrivals --airline LY --date YYYY-MM-DD
 python3 SKILL_DIR/scripts/query_flights.py --destination JFK --upcoming
 python3 SKILL_DIR/scripts/query_flights.py --flight LY001
 python3 SKILL_DIR/scripts/query_flights.py --status DELAYED
@@ -69,7 +69,7 @@ python3 SKILL_DIR/scripts/query_flights.py --search "London"
 
 Flags can be combined. All scripts return JSON — Claude handles formatting for the user.
 
-> **CRITICAL: Always use `--date` when counting or listing flights for a specific day.** Without `--date`, the API returns a rolling ~3-day window and results will include flights from other days, inflating counts. This is the #1 source of incorrect answers.
+> **CRITICAL: Always use `--date YYYY-MM-DD` when counting or listing flights for a specific day.** Without it, the API returns a rolling ~3-day window, inflating counts. When `--date` is set, the script automatically pages through all API results before filtering, so counts are accurate. Replace `YYYY-MM-DD` with the actual date (e.g., `2026-04-03`).
 
 For raw API access, use `curl` directly — see [references/api.md](references/api.md) for filter patterns.
 

@@ -25,6 +25,7 @@ Flags:
 """
 
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -79,6 +80,9 @@ def parse_args(argv):
                 sys.exit(1)
         elif a == "--date" and i + 1 < len(argv):
             i += 1
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", argv[i]):
+                print(f"Invalid --date format: {argv[i]} (expected YYYY-MM-DD)", file=sys.stderr)
+                sys.exit(1)
             args["date"] = argv[i]
         elif a == "--upcoming":
             args["upcoming"] = True
@@ -122,20 +126,23 @@ def parse_flight_number(flight):
     return flight, None
 
 
-def fetch(args):
-    url = f"{API_BASE}&limit={args['limit']}&sort={quote(args['sort'])}"
+def _build_base_url(args):
+    """Build the API URL without offset/limit (shared by fetch and fetch_all)."""
+    url = f"{API_BASE}&sort={quote(args['sort'])}"
     if args["filters"]:
         url += f"&filters={quote(json.dumps(args['filters']))}"
     if args["search"] and args["search"].strip():
-        # Partial/prefix search: sanitize, append :* to each word, use plain=false
-        import re
         words = args["search"].strip().split()
-        # Strip tsquery operators to prevent injection: keep only alphanumeric + Hebrew
         sanitized = [re.sub(r"[^a-zA-Z0-9\u0590-\u05FF]", "", w) for w in words]
         sanitized = [w for w in sanitized if w]
         if sanitized:
             term = " & ".join(f"{w}:*" for w in sanitized)
             url += f"&q={quote(term)}&plain=false"
+    return url
+
+
+def _fetch_page(url):
+    """Fetch a single API page and return (records, total)."""
     try:
         req = Request(url, headers={"User-Agent": USER_AGENT})
         with urlopen(req, timeout=30) as resp:
@@ -150,6 +157,26 @@ def fetch(args):
         print(f"API error: {data.get('error', 'unknown')}", file=sys.stderr)
         sys.exit(1)
     return data["result"]["records"], data["result"].get("total", 0)
+
+
+def fetch(args):
+    url = _build_base_url(args) + f"&limit={args['limit']}"
+    return _fetch_page(url)
+
+
+def fetch_all(args):
+    """Fetch all pages from the API. Used when --date requires complete results."""
+    page_size = 200
+    base_url = _build_base_url(args)
+    records, total = _fetch_page(base_url + f"&limit={page_size}&offset=0")
+    all_records = list(records)
+    while len(all_records) < total:
+        offset = len(all_records)
+        page, _ = _fetch_page(base_url + f"&limit={page_size}&offset={offset}")
+        if not page:
+            break
+        all_records.extend(page)
+    return all_records, total
 
 
 def clean(record):
@@ -179,7 +206,7 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: query_flights.py [--departures|--arrivals] [--airline CODE] "
               "[--destination CODE] [--flight LY001] [--status DELAYED] "
-              "[--search TEXT]")
+              "[--search TEXT] [--date YYYY-MM-DD] [--upcoming] [--max N]")
         sys.exit(0)
 
     args = parse_args(sys.argv)
@@ -188,11 +215,14 @@ def main():
     if args["upcoming"] and "CHRMINE" not in args["filters"]:
         args["filters"]["CHRMINE"] = ["ON TIME", "DELAYED", "EARLY", "FINAL", "NOT FINAL"]
 
-    records, _ = fetch(args)
-    results = [clean(r) for r in records]
-
+    # When --date is set, fetch all pages to avoid truncation, then filter client-side
     if args["date"]:
+        records, _ = fetch_all(args)
+        results = [clean(r) for r in records]
         results = [r for r in results if r["date"] == args["date"]]
+    else:
+        records, _ = fetch(args)
+        results = [clean(r) for r in records]
 
     if args["max_results"]:
         results = results[:args["max_results"]]
