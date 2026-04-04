@@ -91,6 +91,8 @@ python3 -c "import json; f=open('$HOME/.natbag/config.json','r+'); d=json.load(f
 
 | Version | Description |
 |---------|-------------|
+| 1.2.1 | Version bump to force marketplace sync with v1.2.0 fixes |
+| 1.2.0 | `--date` filter for accurate single-day counts, automatic pagination, input validation |
 | 1.1.0 | Flight change history tracking — status/time/gate changes logged per snapshot |
 | 1.0.10 | Fix hook protocol errors for non-natbag skills, file locking, atomic DB upgrades |
 | 1.0.9 | Merged airport data (9,240 airports from ip2location + OpenFlights), city-name geocoding |
